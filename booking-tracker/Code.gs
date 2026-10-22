@@ -1,4 +1,8 @@
 /**
+ * @OnlyCurrentDoc  Limits the script to this one spreadsheet, not all your Sheets.
+ */
+
+/**
  * Proudfoot Holiday Farm booking tracker.
  *
  * Paste this into Extensions > Apps Script in the bookings Google Sheet, and add the
