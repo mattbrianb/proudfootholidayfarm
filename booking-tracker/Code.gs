@@ -41,6 +41,7 @@ var CAPACITY = { 'main-house': { sleeps: 15, max: 17 }, 'cottage': { sleeps: 2, 
 
 /** Run this once from the Apps Script editor to set up the sheet. */
 function setup() {
+  assertOwner_(); // only allow-listed accounts (it is also callable from any page this script serves)
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME, 0);
   sh.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]).setFontWeight('bold').setBackground('#2f6b3f').setFontColor('#ffffff');
@@ -93,29 +94,29 @@ function doGet(e) {
 function doPost(e) {
   try {
     var d = JSON.parse(e.postData.contents || '{}');
-    if (d.website) return json({ ok: true }); // spam trap filled in
+    if (d.website) return json_({ ok: true }); // spam trap filled in
     var required = ['place', 'arrive', 'leave', 'adults', 'name', 'phone', 'email'];
-    for (var i = 0; i < required.length; i++) if (!d[required[i]]) return json({ ok: false, error: 'missing ' + required[i] });
-    if (!PLACES[d.place]) return json({ ok: false, error: 'unknown place' });
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(d.email))) return json({ ok: false, error: 'bad email' });
-    var guests = num(d.adults) + num(d.children), cap = CAPACITY[d.place];
-    if (guests > cap.max) return json({ ok: false, error: 'too many guests' });
+    for (var i = 0; i < required.length; i++) if (!d[required[i]]) return json_({ ok: false, error: 'missing ' + required[i] });
+    if (!PLACES[d.place]) return json_({ ok: false, error: 'unknown place' });
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(d.email))) return json_({ ok: false, error: 'bad email' });
+    var guests = num_(d.adults) + num_(d.children), cap = CAPACITY[d.place];
+    if (guests > cap.max) return json_({ ok: false, error: 'too many guests' });
 
     // Flood protection: one enquiry per email address every 10 minutes.
     var cache = CacheService.getScriptCache(), key = 'e:' + String(d.email).toLowerCase();
-    if (cache.get(key)) return json({ ok: true });
+    if (cache.get(key)) return json_({ ok: true });
     cache.put(key, '1', 600);
 
-    var arrive = toDate(d.arrive), leave = toDate(d.leave);
-    if (!arrive || !leave || leave <= arrive) return json({ ok: false, error: 'bad dates' });
+    var arrive = toDate_(d.arrive), leave = toDate_(d.leave);
+    if (!arrive || !leave || leave <= arrive) return json_({ ok: false, error: 'bad dates' });
     var nights = Math.round((leave - arrive) / 864e5);
     var id = newId_();
 
     var lock = LockService.getScriptLock();
     lock.waitLock(10000);
     var sh = sheet_();
-    sh.appendRow(['Pending', PLACES[d.place], arrive, leave, nights, clean(d.name), clean(d.phone), clean(d.email),
-      num(d.adults), num(d.children), num(d.dogs), clean(d.message, 2000), new Date(), clean(d.estimate), id]);
+    sh.appendRow(['Pending', PLACES[d.place], arrive, leave, nights, clean_(d.name), clean_(d.phone), clean_(d.email),
+      num_(d.adults), num_(d.children), num_(d.dogs), clean_(d.message, 2000), new Date(), clean_(d.estimate), id]);
     lock.releaseLock();
 
     var clash = overlaps_(PLACES[d.place], arrive, leave, id);
@@ -125,13 +126,13 @@ function doPost(e) {
       '',
       'Place: ' + PLACES[d.place],
       'Dates: ' + fmt(arrive) + ' to ' + fmt(leave) + ' (' + nights + ' nights)',
-      'Adults: ' + num(d.adults) + '   Children (aged 2-12): ' + num(d.children) + '   Dogs: ' + num(d.dogs),
-      d.estimate ? 'Estimated total shown to the guest: ' + clean(d.estimate) : '',
+      'Adults: ' + num_(d.adults) + '   Children (aged 2-12): ' + num_(d.children) + '   Dogs: ' + num_(d.dogs),
+      d.estimate ? 'Estimated total shown to the guest: ' + clean_(d.estimate) : '',
       '',
-      'Name: ' + clean(d.name),
-      'Phone: ' + clean(d.phone),
-      'Email: ' + clean(d.email),
-      d.message ? '\nMessage:\n' + clean(d.message, 2000) : '',
+      'Name: ' + clean_(d.name),
+      'Phone: ' + clean_(d.phone),
+      'Email: ' + clean_(d.email),
+      d.message ? '\nMessage:\n' + clean_(d.message, 2000) : '',
       clash ? '\nHeads up: these dates overlap a Confirmed or Blocked booking.' : '',
       guests > cap.sleeps ? '\nHeads up: ' + guests + ' guests is more than the usual ' + cap.sleeps + '. Confirm with the guest before accepting.' : '',
       '',
@@ -139,15 +140,15 @@ function doPost(e) {
     ].join('\n');
     MailApp.sendEmail({
       to: OWNER_EMAIL,
-      replyTo: clean(d.email),
-      subject: 'Booking enquiry: ' + PLACES[d.place] + ', ' + fmt(arrive) + ' (' + clean(d.name) + ')',
+      replyTo: clean_(d.email),
+      subject: 'Booking enquiry: ' + PLACES[d.place] + ', ' + fmt(arrive) + ' (' + clean_(d.name) + ')',
       body: body
     });
 
     if (AUTO_REPLY) guestReply_(d, arrive, leave, nights, guests, cap, fmt);
-    return json({ ok: true });
+    return json_({ ok: true });
   } catch (err) {
-    return json({ ok: false, error: String(err) });
+    return json_({ ok: false, error: String(err) });
   }
 }
 
@@ -155,20 +156,20 @@ function doPost(e) {
 function guestReply_(d, arrive, leave, nights, guests, cap, fmt) {
   var cache = CacheService.getScriptCache();
   var hourKey = 'replies:' + Utilities.formatDate(new Date(), 'UTC', 'yyyyMMddHH');
-  var sent = num(cache.get(hourKey));
+  var sent = num_(cache.get(hourKey));
   if (sent >= AUTO_REPLY_PER_HOUR || MailApp.getRemainingDailyQuota() < 5) return;
   cache.put(hourKey, String(sent + 1), 3600);
 
   var first = String(d.name).trim().split(/\s+/)[0] || 'there';
-  var guestLine = plural_(num(d.adults), 'adult', 'adults') + (num(d.children) ? ', ' + plural_(num(d.children), 'child', 'children') : '') +
-    (num(d.dogs) ? ', ' + plural_(num(d.dogs), 'dog', 'dogs') : '');
+  var guestLine = plural_(num_(d.adults), 'adult', 'adults') + (num_(d.children) ? ', ' + plural_(num_(d.children), 'child', 'children') : '') +
+    (num_(d.dogs) ? ', ' + plural_(num_(d.dogs), 'dog', 'dogs') : '');
   var over = guests > cap.sleeps;
   var lines = [
     ['Place', 'The ' + PLACES[d.place]],
     ['Dates', fmt(arrive) + ' to ' + fmt(leave) + ' (' + plural_(nights, 'night', 'nights') + ')'],
     ['Guests', guestLine]
   ];
-  if (d.estimate) lines.push(['Estimated total', clean(d.estimate)]);
+  if (d.estimate) lines.push(['Estimated total', clean_(d.estimate)]);
   var steps = [
     'We check availability for your dates' + (over ? ' and whether we can fit your group of ' + guests + ' (the ' + PLACES[d.place] + ' usually sleeps ' + cap.sleeps + ')' : '') + ', then get back to you to confirm.',
     'Once we have confirmed, we send banking details for the 50% deposit, which secures your booking.',
@@ -247,12 +248,12 @@ function setStatus(id, status) {
 function blockDates(place, from, to, note) {
   assertOwner_();
   if (!PLACES[place]) throw new Error('Unknown place');
-  var a = toDate(from), b = toDate(to);
+  var a = toDate_(from), b = toDate_(to);
   if (!a || !b || b <= a) throw new Error('The end date must be after the start date');
   var row = HEADERS.map(function () { return ''; });
   row[COL['Status']] = 'Blocked'; row[COL['Place']] = PLACES[place];
   row[COL['Arrive']] = a; row[COL['Leave']] = b; row[COL['Nights']] = Math.round((b - a) / 864e5);
-  row[COL['Guest name']] = clean(note || 'Blocked by owner'); row[COL['Received']] = new Date(); row[COL['ID']] = newId_();
+  row[COL['Guest name']] = clean_(note || 'Blocked by owner'); row[COL['Received']] = new Date(); row[COL['ID']] = newId_();
   sheet_().appendRow(row);
   return true;
 }
@@ -279,13 +280,13 @@ function readRows_(withDetails) {
   var out = [], missingIds = false;
   values.forEach(function (r, i) {
     if (withDetails && !r[COL['ID']] && (r[COL['Status']] || r[COL['Arrive']])) { r[COL['ID']] = newId_(); missingIds = true; }
-    var b = { status: String(r[COL['Status']]).trim(), place: placeKey(r[COL['Place']]), arrive: day(r[COL['Arrive']]), leave: day(r[COL['Leave']]) };
+    var b = { status: String(r[COL['Status']]).trim(), place: placeKey_(r[COL['Place']]), arrive: day(r[COL['Arrive']]), leave: day(r[COL['Leave']]) };
     if (withDetails) {
       b.id = String(r[COL['ID']]);
       b.name = String(r[COL['Guest name']]); b.phone = String(r[COL['Phone']]); b.email = String(r[COL['Email']]);
-      b.adults = num(r[COL['Adults']]); b.children = num(r[COL['Children']]); b.dogs = num(r[COL['Dogs']]);
+      b.adults = num_(r[COL['Adults']]); b.children = num_(r[COL['Children']]); b.dogs = num_(r[COL['Dogs']]);
       b.message = String(r[COL['Message']]); b.estimate = String(r[COL['Estimate']]);
-      b.nights = b.arrive && b.leave ? Math.round((toDate(b.leave) - toDate(b.arrive)) / 864e5) : 0;
+      b.nights = b.arrive && b.leave ? Math.round((toDate_(b.leave) - toDate_(b.arrive)) / 864e5) : 0;
       b.over = b.place ? b.adults + b.children > CAPACITY[b.place].sleeps : false;
     }
     if (b.place) out.push(b);
@@ -298,29 +299,29 @@ function readRows_(withDetails) {
 function overlaps_(place, arrive, leave, exceptId) {
   var a = Utilities.formatDate(arrive, Session.getScriptTimeZone(), 'yyyy-MM-dd');
   var l = Utilities.formatDate(leave, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-  var key = placeKey(place);
+  var key = placeKey_(place);
   return readRows_(true).some(function (b) {
     return b.id !== exceptId && BLOCKING.indexOf(b.status) > -1 && b.place === key && b.arrive < l && b.leave > a;
   });
 }
-function placeKey(name) {
+function placeKey_(name) {
   var n = String(name).toLowerCase();
   if (n.indexOf('main') > -1) return 'main-house';
   if (n.indexOf('cottage') > -1) return 'cottage';
   return null;
 }
 function newId_() { return Utilities.getUuid().slice(0, 8); }
-function toDate(s) {
+function toDate_(s) {
   var p = String(s).split('-');
   return p.length === 3 ? new Date(+p[0], +p[1] - 1, +p[2]) : null;
 }
-function num(v) { var n = parseInt(v, 10); return isNaN(n) ? 0 : n; }
+function num_(v) { var n = parseInt(v, 10); return isNaN(n) ? 0 : n; }
 function plural_(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
-function clean(v, max) {
+function clean_(v, max) {
   var s = String(v || '').replace(/^[=+\-@]/, "'$&"); // stop text being read as a spreadsheet formula
   return s.slice(0, max || 200);
 }
 function esc_(s) {
   return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
 }
-function json(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
+function json_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }

@@ -9,7 +9,7 @@ window.PROUDFOOT = {
 
   // Paste the Google Apps Script web app URL here once the booking tracker is set up
   // (see booking-tracker/SETUP.md). Leave empty to send enquiries by email instead.
-  trackerUrl: '',
+  trackerUrl: 'https://script.google.com/macros/s/AKfycbwXXjbR1U6ASneUneFYKx1oR_fvSfrkITfECxNbdb5H-Yx72F4_l9OAF1i22C05QARu/exec',
 
   // Instagram feed: paste your Behold JSON feed URL here (https://feeds.behold.so/...).
   // Leave empty to show just the "Follow us" link. See README.md > Instagram feed.
