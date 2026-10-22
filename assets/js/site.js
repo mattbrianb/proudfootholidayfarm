@@ -114,7 +114,7 @@
         b.type = 'button'; b.className = 'day'; b.textContent = day; b.dataset.date = s;
         var label = day + ' ' + MONTHS[m];
         if (s < t) { b.classList.add('past'); b.disabled = true; }
-        else if (isBooked(s)) { b.classList.add('booked'); label += ', booked'; }
+        else if (isBooked(s)) { b.classList.add('booked'); label += ', booked, unavailable'; b.title = 'Booked, unavailable'; }
         if (s === t) b.classList.add('today');
         if (sel.a && s === sel.a) b.classList.add('start');
         if (sel.b && s === sel.b) b.classList.add('end');
@@ -138,7 +138,7 @@
       form.dispatchEvent(new Event('input'));
     }
     function pick(s) {
-      if (isBooked(s) && !(sel.a && !sel.b && s > sel.a)) { say('That night is already booked. Please pick another date.', true); return; }
+      if (isBooked(s) && !(sel.a && !sel.b && s > sel.a)) { say('That night is booked and unavailable. Please pick another date.', true); return; }
       if (!sel.a || sel.b || s <= sel.a) { sel = { a: s, b: null }; say('Arriving ' + pretty(s) + '. Now pick the day you leave.'); }
       else if (!rangeClear(sel.a, s)) { say('Some nights between those dates are booked. Please choose different dates.', true); sel = { a: null, b: null }; }
       else { sel.b = s; var n = nights(sel.a, sel.b); say(pretty(sel.a) + ' to ' + pretty(sel.b) + ' · ' + n + ' night' + (n === 1 ? '' : 's') + '. ' + (live ? 'Those dates look free. Send your enquiry below to book.' : 'Send your enquiry below and we will confirm availability.')); }
@@ -164,7 +164,7 @@
     loadAvailability().then(function (data) {
       if (!data) say('Pick your dates and send an enquiry. We will confirm availability when we reply.');
       else if (data.error) say('We could not load booked dates right now. Send your enquiry and we will confirm.', true);
-      else { live = true; var bk = $('[data-key-booked]', el); if (bk) bk.hidden = false; booked = (data[place] || []).map(function (r) { return [r[0], r[1]]; }); say('Crossed-out dates are booked. Tap your arrival day, then the day you leave.'); }
+      else { live = true; var bk = $('[data-key-booked]', el); if (bk) bk.hidden = false; booked = (data[place] || []).map(function (r) { return [r[0], r[1]]; }); say('Crossed-out dates are booked and unavailable. Tap your arrival day, then the day you leave.'); }
       self.setRange(sel.a, sel.b);
     });
   }

@@ -9,6 +9,7 @@
 <style>
 :root{--ink:#1f2421;--muted:#545c57;--line:#e2e6e2;--wash:#f3f6f2;--green:#2f6b3f;--green-d:#24532f;--green-l:#e3eee5;--amber:#fff4d6;--amber-ink:#6b4a00;--red:#a3321f;--red-l:#f8e9e5;--grey:#d9ddd9}
 *{box-sizing:border-box;margin:0}
+[hidden]{display:none!important}
 body{font-family:Figtree,system-ui,sans-serif;font-size:16px;line-height:1.5;color:var(--ink);background:var(--wash);-webkit-font-smoothing:antialiased}
 button,input,select{font:inherit}
 :focus-visible{outline:3px solid var(--green);outline-offset:2px}
@@ -64,6 +65,20 @@ form.block input,form.block select{border:1.5px solid #cfd5d0;border-radius:10px
 .toast.show{opacity:1;transform:none}
 .toast.err{background:var(--red)}
 .foot{text-align:center;margin-top:20px;font-size:14px}
+dialog{border:0;border-radius:18px;padding:0;width:min(460px,calc(100vw - 24px));max-width:none;color:var(--ink);box-shadow:0 24px 60px rgba(15,20,17,.35)}
+dialog::backdrop{background:rgba(15,20,17,.55)}
+.dlg{padding:20px}
+.dlg h3{font-family:Gelasio,Georgia,serif;font-size:21px;margin-bottom:8px}
+.dlg p{color:var(--muted)}
+.dlg .tick{display:flex;gap:10px;align-items:flex-start;margin-top:14px;font-weight:600}
+.dlg .tick input{width:20px;height:20px;margin-top:2px;accent-color:var(--green)}
+.dlg .tick small{display:block;font-weight:400;color:var(--muted)}
+.dlg .row{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
+.dlg .warn{background:var(--red-l);color:var(--red);border-radius:10px;padding:10px 12px;margin-top:12px;font-weight:600}
+form.edit{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+form.edit label{display:flex;flex-direction:column;gap:4px;font-size:14px;font-weight:600}
+form.edit .full{grid-column:1/-1}
+form.edit input,form.edit select{border:1.5px solid #cfd5d0;border-radius:10px;padding:10px 12px;background:#fff;color:var(--ink)}
 .foot a{color:var(--green)}
 </style>
 </head>
@@ -95,6 +110,26 @@ form.block input,form.block select{border:1.5px solid #cfd5d0;border-radius:10px
 
   <p class="foot"><a id="sheet-link" href="#" target="_blank" rel="noopener">Open the full bookings sheet</a></p>
 </main>
+<dialog id="act" aria-labelledby="act-h"><div class="dlg">
+  <h3 id="act-h"></h3><p id="act-p"></p>
+  <label class="tick"><input type="checkbox" id="act-mail" checked><span id="act-mail-l"></span></label>
+  <p class="warn" id="act-warn" hidden></p>
+  <div class="row"><button class="btn ghost" type="button" id="act-cancel">Back</button><button class="btn go" type="button" id="act-ok"></button></div>
+</div></dialog>
+<dialog id="edit" aria-labelledby="edit-h"><div class="dlg">
+  <h3 id="edit-h">Change booking</h3><p id="edit-who"></p>
+  <form class="edit" id="edit-form">
+    <label class="full">Place<select name="place"><option value="main-house">Main House</option><option value="cottage">Cottage</option></select></label>
+    <label>Arrive<input type="date" name="arrive" required></label>
+    <label>Leave<input type="date" name="leave" required></label>
+    <label>Adults<input type="number" name="adults" min="1" max="17" required></label>
+    <label>Children (aged 2 to 12)<input type="number" name="children" min="0" max="16"></label>
+    <label>Dogs<input type="number" name="dogs" min="0" max="10"></label>
+  </form>
+  <label class="tick" id="edit-mail-row"><input type="checkbox" id="edit-mail" checked><span>Email the guest the new details<small>They get the updated dates, guests and estimated total.</small></span></label>
+  <p class="warn" id="edit-warn" hidden></p>
+  <div class="row"><button class="btn ghost" type="button" id="edit-cancel">Back</button><button class="btn go" type="button" id="edit-ok">Save changes</button></div>
+</div></dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -114,9 +149,69 @@ form.block input,form.block select{border:1.5px solid #cfd5d0;border-radius:10px
   function toast(msg, err) { var t = $('toast'); t.textContent = msg; t.className = 'toast show' + (err ? ' err' : ''); clearTimeout(toast.t); toast.t = setTimeout(function () { t.className = 'toast'; }, 3200); }
   function phoneDigits(p) { var d = String(p).replace(/[^\d+]/g, ''); if (d.charAt(0) === '0') d = '27' + d.slice(1); return d.replace('+', ''); }
 
-  function call(fn, args, ok) {
-    var r = google.script.run.withSuccessHandler(ok).withFailureHandler(function (e) { toast(e && e.message ? e.message : 'Something went wrong. Try again.', true); });
+  function errText(e) { return e && e.message ? e.message : 'Something went wrong. Try again.'; }
+  function call(fn, args, ok, fail) {
+    var r = google.script.run.withSuccessHandler(ok).withFailureHandler(fail || function (e) { toast(errText(e), true); });
     r[fn].apply(r, args);
+  }
+
+  /* Approve / reject / cancel / reopen, with an "email the guest" choice */
+  var ACTIONS = {
+    Confirmed: { title: 'Approve this booking?', ok: 'Approve', mail: 'Email the guest a confirmation', hint: 'With the dates, total and 50% deposit. You send payment details separately.', done: 'Approved. The website now shows these dates as booked.' },
+    Declined: { title: 'Reject this enquiry?', ok: 'Reject', mail: 'Email the guest a polite "not available"', hint: 'It invites them to pick other dates.', done: 'Rejected.' },
+    Cancelled: { title: 'Cancel this booking?', ok: 'Cancel booking', mail: 'Email the guest that it is cancelled', hint: '', done: 'Cancelled. The dates are free again on the website.' },
+    Reopen: { title: 'Reopen these dates?', ok: 'Reopen', mail: '', hint: '', done: 'Reopened. The dates are free again on the website.' }
+  };
+  function action(kind, b) {
+    var a = ACTIONS[kind], d = $('act'), warn = $('act-warn'), okBtn = $('act-ok'), force = false;
+    $('act-h').textContent = a.title;
+    $('act-p').textContent = (b.status === 'Blocked' ? 'Closed: ' + (b.name || '') : (b.name || 'Guest')) + ' · ' + PLACE[b.place] + ' · ' + pretty(b.arrive) + ' to ' + pretty(b.leave);
+    var canMail = !!a.mail && !!b.email;
+    $('act-mail').parentNode.hidden = !canMail; $('act-mail').checked = canMail;
+    $('act-mail-l').textContent = a.mail;
+    if (a.hint) $('act-mail-l').appendChild(el('small', '', a.hint));
+    warn.hidden = true; okBtn.textContent = a.ok; okBtn.className = 'btn ' + (kind === 'Confirmed' || kind === 'Reopen' ? 'go' : 'no'); okBtn.disabled = false;
+    okBtn.onclick = function () {
+      okBtn.disabled = true;
+      var status = kind === 'Reopen' ? 'Cancelled' : kind;
+      call('setStatus', [b.id, status, canMail && $('act-mail').checked, force], function (res) {
+        d.close(); toast(a.done + (res && res.emailed ? ' Guest emailed.' : '')); load();
+      }, function (e) {
+        okBtn.disabled = false;
+        var m = errText(e);
+        if (m.indexOf('CLASH:') > -1) { force = true; warn.textContent = m.split('CLASH:')[1].trim() + ' Press ' + a.ok + ' again to go ahead anyway.'; warn.hidden = false; }
+        else toast(m, true);
+      });
+    };
+    $('act-cancel').onclick = function () { d.close(); };
+    d.showModal();
+  }
+
+  /* Change dates, place or guests */
+  function editBooking(b) {
+    var d = $('edit'), f = $('edit-form'), warn = $('edit-warn'), okBtn = $('edit-ok'), force = false;
+    $('edit-who').textContent = (b.name || 'Booking') + ' · ' + b.status;
+    f.place.value = b.place; f.arrive.value = b.arrive; f.leave.value = b.leave;
+    f.adults.value = b.adults || 1; f.children.value = b.children || 0; f.dogs.value = b.dogs || 0;
+    var guestRows = b.status !== 'Blocked';
+    [f.adults, f.children, f.dogs].forEach(function (i) { i.parentNode.hidden = !guestRows; });
+    $('edit-mail-row').hidden = !(guestRows && b.email); $('edit-mail').checked = guestRows && !!b.email;
+    warn.hidden = true; okBtn.disabled = false;
+    okBtn.onclick = function () {
+      if (!f.reportValidity()) return;
+      okBtn.disabled = true;
+      var changes = { place: f.place.value, arrive: f.arrive.value, leave: f.leave.value, adults: guestRows ? f.adults.value : 1, children: guestRows ? f.children.value : 0, dogs: guestRows ? f.dogs.value : 0 };
+      call('updateBooking', [b.id, changes, !$('edit-mail-row').hidden && $('edit-mail').checked, force], function (res) {
+        d.close(); toast('Saved.' + (res && res.emailed ? ' Guest emailed.' : '')); load();
+      }, function (e) {
+        okBtn.disabled = false;
+        var m = errText(e);
+        if (m.indexOf('CLASH:') > -1) { force = true; warn.textContent = m.split('CLASH:')[1].trim() + ' Press Save again to keep it anyway.'; warn.hidden = false; }
+        else { warn.textContent = m; warn.hidden = false; }
+      });
+    };
+    $('edit-cancel').onclick = function () { d.close(); };
+    d.showModal();
   }
   function load() {
     $('month-name').textContent = MONTHS[view.m] + ' ' + view.y;
@@ -143,16 +238,10 @@ form.block input,form.block select{border:1.5px solid #cfd5d0;border-radius:10px
       if (b.clash) c.appendChild(el('p', 'flag clash', 'These dates overlap a confirmed or blocked booking.'));
       if (b.over) c.appendChild(el('p', 'flag over', 'More guests than the ' + PLACE[b.place] + ' usually sleeps. Check before confirming.'));
       var act = el('div', 'actions');
-      var yes = el('button', 'btn go', 'Confirm'); yes.type = 'button';
-      var no = el('button', 'btn no', 'Decline'); no.type = 'button';
-      [[yes, 'Confirmed'], [no, 'Declined']].forEach(function (pair) {
-        pair[0].addEventListener('click', function () {
-          if (pair[1] === 'Declined' && !confirm('Decline the enquiry from ' + (b.name || 'this guest') + '?')) return;
-          yes.disabled = no.disabled = true;
-          call('setStatus', [b.id, pair[1]], function () { toast(pair[1] === 'Confirmed' ? 'Confirmed. The website now shows these dates as booked.' : 'Declined.'); load(); });
-        });
-      });
-      act.appendChild(yes); act.appendChild(no);
+      var yes = el('button', 'btn go', 'Approve'); yes.type = 'button'; yes.addEventListener('click', function () { action('Confirmed', b); });
+      var no = el('button', 'btn no', 'Reject'); no.type = 'button'; no.addEventListener('click', function () { action('Declined', b); });
+      var ch = el('button', 'btn ghost', 'Change'); ch.type = 'button'; ch.addEventListener('click', function () { editBooking(b); });
+      act.appendChild(yes); act.appendChild(no); act.appendChild(ch);
       if (b.phone) {
         var tel = el('a', 'btn ghost', 'Call'); tel.href = 'tel:' + String(b.phone).replace(/[^\d+]/g, ''); act.appendChild(tel);
         var wa = el('a', 'btn ghost', 'WhatsApp'); wa.href = 'https://wa.me/' + phoneDigits(b.phone); wa.target = '_blank'; wa.rel = 'noopener'; act.appendChild(wa);
@@ -195,15 +284,19 @@ form.block input,form.block select{border:1.5px solid #cfd5d0;border-radius:10px
       txt.appendChild(el('p', 'meta', (b.name || '') + (b.status !== 'Blocked' ? ' · ' + guestsLine(b) : '') + (b.phone ? ' · ' + b.phone : '')));
       item.appendChild(el('span', 'status ' + b.status, b.status));
       item.appendChild(txt);
-      if (b.status === 'Confirmed') {
-        var cancel = el('button', 'btn no', 'Cancel'); cancel.type = 'button'; cancel.style.marginLeft = 'auto'; cancel.style.alignSelf = 'center';
-        cancel.addEventListener('click', function () {
-          if (!confirm('Mark the booking for ' + (b.name || 'this guest') + ' as cancelled? The dates will open up on the website.')) return;
-          cancel.disabled = true;
-          call('setStatus', [b.id, 'Cancelled'], function () { toast('Cancelled. The dates are free again.'); load(); });
-        });
-        item.appendChild(cancel);
+      var btns = el('div', 'actions'); btns.style.marginLeft = 'auto'; btns.style.marginTop = '0'; btns.style.alignSelf = 'center';
+      var change = el('button', 'btn ghost', 'Change'); change.type = 'button'; change.addEventListener('click', function () { editBooking(b); });
+      btns.appendChild(change);
+      if (b.status === 'Confirmed' || b.status === 'Blocked') {
+        var kind = b.status === 'Blocked' ? 'Reopen' : 'Cancelled';
+        var end = el('button', 'btn no', b.status === 'Blocked' ? 'Reopen' : 'Cancel'); end.type = 'button';
+        end.addEventListener('click', function () { action(kind, b); });
+        btns.appendChild(end);
+      } else if (b.status === 'Pending') {
+        var ap = el('button', 'btn go', 'Approve'); ap.type = 'button'; ap.addEventListener('click', function () { action('Confirmed', b); });
+        btns.insertBefore(ap, change);
       }
+      item.appendChild(btns);
       list.appendChild(item);
     });
   }

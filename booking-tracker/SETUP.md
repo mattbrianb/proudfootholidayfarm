@@ -88,13 +88,18 @@ Don't put the dashboard link on the website. Keep it in the owner's bookmarks or
 ## Using the dashboard
 
 - **Needs a reply:** every upcoming Pending enquiry, with the dates, guests, estimate and message. It warns you if the dates overlap a confirmed booking or the group is bigger than usual.
-  - Tap **Confirm** or **Decline**.
+  - **Approve** confirms the booking. The website shows those nights as "Booked, unavailable" straight away. Tick **Email the guest** to send a confirmation with the dates, total and 50% deposit; you send payment details yourself.
+  - **Reject** declines the enquiry. You can email the guest a polite "not available" that invites them to pick other dates.
+  - **Change** edits the place, dates or guest numbers. The estimate is recalculated, and you can email the guest the new details.
   - **Call**, **WhatsApp** and **Email** contact the guest straight away.
+- **Double-booking guard:** if you approve or move a booking onto dates that are already confirmed or closed, the dashboard stops and warns you. Press the button again only if you really mean it.
 - **Month at a glance:** a calendar for each place, with Confirmed nights in green, Pending in amber and Closed in grey. Use the arrows to change month.
-- **Bookings this month:** a list of everyone staying. Tap **Cancel** to free up a confirmed booking's dates.
+- **Bookings this month:**
+  - **Confirmed** bookings can be changed or cancelled (with an optional email to the guest).
+  - **Closed** dates can be changed or reopened.
 - **Close dates:** blocks nights for family visits or maintenance. The website shows them as booked.
 
-Changes show on the website calendar straight away.
+Every "Email the guest" message comes from the Google account that owns the script, with the name "Proudfoot Holiday Farm". Replies go to `OWNER_EMAIL`.
 
 ## Working in the Sheet directly
 

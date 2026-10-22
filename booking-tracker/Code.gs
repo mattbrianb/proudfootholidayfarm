@@ -38,6 +38,8 @@ var BLOCKING = ['Confirmed', 'Blocked'];
 var PLACES = { 'main-house': 'Main House', 'cottage': 'Cottage' };
 // Guests (adults + children): sleeps normally, max only by arrangement.
 var CAPACITY = { 'main-house': { sleeps: 15, max: 17 }, 'cottage': { sleeps: 2, max: 3 } };
+// Per night. Keep in step with the website (assets/js/site.js) when prices change.
+var RATES = { adult: 600, child: 300, dog: 50 };
 
 /** Run this once from the Apps Script editor to set up the sheet. */
 function setup() {
@@ -115,11 +117,11 @@ function doPost(e) {
     var lock = LockService.getScriptLock();
     lock.waitLock(10000);
     var sh = sheet_();
-    sh.appendRow(['Pending', PLACES[d.place], arrive, leave, nights, clean_(d.name), clean_(d.phone), clean_(d.email),
+    sh.appendRow(['Pending', PLACES[d.place], arrive, leave, nights, clean_(d.name), phone_(d.phone), clean_(d.email),
       num_(d.adults), num_(d.children), num_(d.dogs), clean_(d.message, 2000), new Date(), clean_(d.estimate), id]);
     lock.releaseLock();
 
-    var clash = overlaps_(PLACES[d.place], arrive, leave, id);
+    var clash = clashes_(d.place, d.arrive, d.leave, id);
     var tz = Session.getScriptTimeZone(), fmt = function (x) { return Utilities.formatDate(x, tz, 'EEE d MMM yyyy'); };
     var body = [
       'New booking enquiry from the website.',
@@ -225,23 +227,128 @@ function getDashboard(year, month) {
   return { year: year, month: month, today: today, bookings: inMonth, pending: pending, sheetUrl: SpreadsheetApp.getActiveSpreadsheet().getUrl() };
 }
 
-/** Change a booking's status (Confirmed, Declined, Cancelled, Pending). */
-function setStatus(id, status) {
+/**
+ * Approve, decline or cancel a booking. notify: email the guest. force: approve even if the
+ * dates overlap another confirmed or blocked booking.
+ */
+function setStatus(id, status, notify, force) {
   assertOwner_();
   if (['Pending', 'Confirmed', 'Declined', 'Cancelled'].indexOf(status) === -1) throw new Error('Unknown status');
   var lock = LockService.getScriptLock();
   lock.waitLock(10000);
+  var b;
   try {
-    var sh = sheet_(), last = sh.getLastRow();
-    if (last < 2) throw new Error('No bookings');
-    var ids = sh.getRange(2, COL['ID'] + 1, last - 1, 1).getValues();
-    for (var i = 0; i < ids.length; i++) {
-      if (String(ids[i][0]) === String(id)) { sh.getRange(i + 2, COL['Status'] + 1).setValue(status); return true; }
+    var found = findRow_(id);
+    b = found.booking;
+    if (status === 'Confirmed' && !force && clashes_(b.place, b.arrive, b.leave, b.id)) {
+      throw new Error('CLASH: These dates overlap another confirmed or closed booking for the ' + PLACES[b.place] + '.');
     }
-    throw new Error('Booking not found. Refresh and try again.');
+    sheet_().getRange(found.row, COL['Status'] + 1).setValue(status);
   } finally {
     lock.releaseLock();
   }
+  var sent = false;
+  if (notify && b.email) {
+    var kind = { Confirmed: 'confirmed', Declined: 'declined', Cancelled: 'cancelled' }[status];
+    if (kind) { guestEmail_(kind, b); sent = true; }
+  }
+  return { ok: true, emailed: sent };
+}
+
+/** Change a booking's place, dates or guest numbers. */
+function updateBooking(id, changes, notify, force) {
+  assertOwner_();
+  var place = changes.place, a = toDate_(changes.arrive), l = toDate_(changes.leave);
+  if (!PLACES[place]) throw new Error('Unknown place');
+  if (!a || !l || l <= a) throw new Error('The leaving date must be after the arrival date');
+  var adults = num_(changes.adults), children = num_(changes.children), dogs = num_(changes.dogs);
+  if (adults < 1) throw new Error('Add at least 1 adult');
+  if (adults + children > CAPACITY[place].max) throw new Error('Too many guests: the ' + PLACES[place] + ' takes at most ' + CAPACITY[place].max + ' people');
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  var b;
+  try {
+    var found = findRow_(id);
+    var keepsDates = ['Confirmed', 'Blocked'].indexOf(found.booking.status) > -1;
+    if (keepsDates && !force && clashes_(place, changes.arrive, changes.leave, id)) {
+      throw new Error('CLASH: The new dates overlap another confirmed or closed booking for the ' + PLACES[place] + '.');
+    }
+    var nights = Math.round((l - a) / 864e5);
+    var total = nights * (adults * RATES.adult + children * RATES.child + dogs * RATES.dog);
+    var sh = sheet_(), r = found.row;
+    sh.getRange(r, COL['Place'] + 1, 1, 4).setValues([[PLACES[place], a, l, nights]]);
+    sh.getRange(r, COL['Adults'] + 1, 1, 3).setValues([[adults, children, dogs]]);
+    if (found.booking.status !== 'Blocked') sh.getRange(r, COL['Estimate'] + 1).setValue(rands_(total) + ' for ' + plural_(nights, 'night', 'nights') + ' (deposit ' + rands_(total / 2) + ')');
+    b = findRow_(id).booking;
+  } finally {
+    lock.releaseLock();
+  }
+  var sent = false;
+  if (notify && b.email && b.status !== 'Blocked') { guestEmail_('updated', b); sent = true; }
+  return { ok: true, emailed: sent };
+}
+
+/** Emails the owner can choose to send a guest from the dashboard. */
+function guestEmail_(kind, b) {
+  var tz = Session.getScriptTimeZone(), fmt = function (s) { return Utilities.formatDate(toDate_(s), tz, 'EEE d MMM yyyy'); };
+  var first = String(b.name).trim().split(/\s+/)[0] || 'there';
+  var placeName = 'the ' + PLACES[b.place];
+  var total = b.nights * (b.adults * RATES.adult + b.children * RATES.child + b.dogs * RATES.dog);
+  var guests = plural_(b.adults, 'adult', 'adults') + (b.children ? ', ' + plural_(b.children, 'child', 'children') : '') + (b.dogs ? ', ' + plural_(b.dogs, 'dog', 'dogs') : '');
+  var details = [
+    ['Place', 'The ' + PLACES[b.place]],
+    ['Dates', fmt(b.arrive) + ' to ' + fmt(b.leave) + ' (' + plural_(b.nights, 'night', 'nights') + ')'],
+    ['Guests', guests]
+  ];
+  var subject, intro, after = [], showDetails = true;
+  if (kind === 'confirmed') {
+    subject = 'Your stay is confirmed: Proudfoot Holiday Farm';
+    intro = 'Good news: your stay at ' + placeName + ' is confirmed.';
+    details.push(['Total', rands_(total)], ['Deposit (50%)', rands_(total / 2)]);
+    after = ['Your booking is secured once the 50% deposit is paid. We will send you the payment details separately.',
+      'Cancellations: more than 1 month before check-in, 50% of the deposit is refunded; more than 2 weeks before, 25%; within 2 weeks, no refund.'];
+  } else if (kind === 'declined') {
+    subject = 'About your enquiry: Proudfoot Holiday Farm';
+    intro = 'Thank you for your interest. Unfortunately we cannot accommodate your stay at ' + placeName + ' from ' + fmt(b.arrive) + ' to ' + fmt(b.leave) + '.';
+    after = ['We would love to have you another time. You can check other dates at ' + SITE_URL + ', or call or WhatsApp us and we will help you find some.'];
+    showDetails = false;
+  } else if (kind === 'cancelled') {
+    subject = 'Your booking has been cancelled: Proudfoot Holiday Farm';
+    intro = 'Your booking at ' + placeName + ' from ' + fmt(b.arrive) + ' to ' + fmt(b.leave) + ' has been cancelled.';
+    after = ['If this is unexpected, or you would like to rebook, please call or WhatsApp us.'];
+    showDetails = false;
+  } else {
+    subject = 'Your booking has been updated: Proudfoot Holiday Farm';
+    intro = 'We have updated your booking. Here are the new details:';
+    details.push(['Estimated total', rands_(total)]);
+    after = ['If anything does not look right, please let us know.'];
+  }
+  var h = esc_;
+  var text = 'Hi ' + first + ',\n\n' + intro + '\n\n' +
+    (showDetails ? details.map(function (x) { return x[0] + ': ' + x[1]; }).join('\n') + '\n\n' : '') +
+    after.join('\n\n') + '\n\nQuestions? Call or WhatsApp ' + PHONE_MAIN + ' (or ' + PHONE_ALT + '), or reply to this email.\n\n' +
+    'Warm regards,\nProudfoot Holiday Farm\n' + SITE_URL;
+  var html = '<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.55;color:#1f2421;max-width:560px">' +
+    '<p>Hi ' + h(first) + ',</p><p>' + h(intro) + '</p>' +
+    (showDetails ? '<table style="border-collapse:collapse;margin:8px 0 16px">' + details.map(function (x) {
+      return '<tr><td style="padding:4px 16px 4px 0;color:#545c57">' + h(x[0]) + '</td><td style="padding:4px 0;font-weight:bold">' + h(x[1]) + '</td></tr>';
+    }).join('') + '</table>' : '') +
+    after.map(function (p) { return '<p>' + h(p) + '</p>'; }).join('') +
+    '<p>Questions? Call or WhatsApp <b>' + h(PHONE_MAIN) + '</b> (or ' + h(PHONE_ALT) + '), or reply to this email.</p>' +
+    '<p>Warm regards,<br><b>Proudfoot Holiday Farm</b><br><a href="' + SITE_URL + '" style="color:#2f6b3f">' + SITE_URL.replace('https://', '') + '</a></p></div>';
+  MailApp.sendEmail({ to: String(b.email).trim(), replyTo: OWNER_EMAIL, name: 'Proudfoot Holiday Farm', subject: subject, body: text, htmlBody: html });
+}
+
+function findRow_(id) {
+  var rows = readRows_(true);
+  for (var i = 0; i < rows.length; i++) if (rows[i].id === String(id)) return { row: rows[i].row, booking: rows[i] };
+  throw new Error('Booking not found. Refresh and try again.');
+}
+
+function clashes_(place, arrive, leave, exceptId) {
+  return readRows_(true).some(function (b) {
+    return b.id !== String(exceptId) && BLOCKING.indexOf(b.status) > -1 && b.place === place && b.arrive < leave && b.leave > arrive;
+  });
 }
 
 /** Close dates for a place (family visit, maintenance). */
@@ -280,7 +387,7 @@ function readRows_(withDetails) {
   var out = [], missingIds = false;
   values.forEach(function (r, i) {
     if (withDetails && !r[COL['ID']] && (r[COL['Status']] || r[COL['Arrive']])) { r[COL['ID']] = newId_(); missingIds = true; }
-    var b = { status: String(r[COL['Status']]).trim(), place: placeKey_(r[COL['Place']]), arrive: day(r[COL['Arrive']]), leave: day(r[COL['Leave']]) };
+    var b = { row: i + 2, status: String(r[COL['Status']]).trim(), place: placeKey_(r[COL['Place']]), arrive: day(r[COL['Arrive']]), leave: day(r[COL['Leave']]) };
     if (withDetails) {
       b.id = String(r[COL['ID']]);
       b.name = String(r[COL['Guest name']]); b.phone = String(r[COL['Phone']]); b.email = String(r[COL['Email']]);
@@ -296,14 +403,6 @@ function readRows_(withDetails) {
   return out;
 }
 
-function overlaps_(place, arrive, leave, exceptId) {
-  var a = Utilities.formatDate(arrive, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-  var l = Utilities.formatDate(leave, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-  var key = placeKey_(place);
-  return readRows_(true).some(function (b) {
-    return b.id !== exceptId && BLOCKING.indexOf(b.status) > -1 && b.place === key && b.arrive < l && b.leave > a;
-  });
-}
 function placeKey_(name) {
   var n = String(name).toLowerCase();
   if (n.indexOf('main') > -1) return 'main-house';
@@ -316,7 +415,9 @@ function toDate_(s) {
   return p.length === 3 ? new Date(+p[0], +p[1] - 1, +p[2]) : null;
 }
 function num_(v) { var n = parseInt(v, 10); return isNaN(n) ? 0 : n; }
+function rands_(n) { return 'R' + String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); }
 function plural_(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
+function phone_(v) { return "'" + String(v || '').replace(/^'+/, '').slice(0, 40); }
 function clean_(v, max) {
   var s = String(v || '').replace(/^[=+\-@]/, "'$&"); // stop text being read as a spreadsheet formula
   return s.slice(0, max || 200);
