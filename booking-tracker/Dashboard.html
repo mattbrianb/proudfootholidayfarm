@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en-ZA">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proudfoot bookings</title>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Gelasio:wght@600&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#1f2421;--muted:#545c57;--line:#e2e6e2;--wash:#f3f6f2;--green:#2f6b3f;--green-d:#24532f;--green-l:#e3eee5;--amber:#fff4d6;--amber-ink:#6b4a00;--red:#a3321f;--red-l:#f8e9e5;--grey:#d9ddd9}
+*{box-sizing:border-box;margin:0}
+body{font-family:Figtree,system-ui,sans-serif;font-size:16px;line-height:1.5;color:var(--ink);background:var(--wash);-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit}
+:focus-visible{outline:3px solid var(--green);outline-offset:2px}
+header{position:sticky;top:0;z-index:5;background:var(--ink);color:#fff;padding:14px 16px;display:flex;align-items:center;gap:12px}
+header h1{font-family:Gelasio,Georgia,serif;font-weight:600;font-size:20px;flex:1}
+.refresh{background:rgba(255,255,255,.12);color:#fff;border:0;border-radius:8px;padding:8px 12px;cursor:pointer}
+main{max-width:760px;margin:0 auto;padding:16px 16px 48px}
+section{background:#fff;border-radius:16px;padding:18px;margin-top:16px;box-shadow:0 2px 10px rgba(15,20,17,.05)}
+h2{font-family:Gelasio,Georgia,serif;font-weight:600;font-size:22px;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+.count{font-family:Figtree,sans-serif;font-size:14px;font-weight:700;background:var(--amber);color:var(--amber-ink);border-radius:999px;padding:2px 10px}
+.muted{color:var(--muted)}
+.empty{color:var(--muted);padding:6px 0}
+.card{border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:12px}
+.card-top{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.card h3{font-size:17px;min-width:0;overflow-wrap:anywhere}
+.place{font-size:13px;font-weight:700;color:var(--green-d);background:var(--green-l);border-radius:999px;padding:2px 10px;white-space:nowrap}
+.dates{font-weight:600;margin-top:6px}
+.meta{font-size:14px;color:var(--muted);margin-top:2px}
+.msg{font-size:14px;margin-top:8px;background:var(--wash);border-radius:8px;padding:8px 10px;white-space:pre-wrap}
+.flag{font-size:13px;font-weight:600;border-radius:8px;padding:6px 10px;margin-top:8px}
+.flag.clash{background:var(--red-l);color:var(--red)}
+.flag.over{background:var(--amber);color:var(--amber-ink)}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.btn{border:0;border-radius:10px;padding:10px 14px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+.btn.go{background:var(--green);color:#fff}
+.btn.no{background:#fff;color:var(--red);box-shadow:inset 0 0 0 1.5px #e3b9b0}
+.btn.ghost{background:#fff;color:var(--green);box-shadow:inset 0 0 0 1.5px var(--green)}
+.btn:disabled{opacity:.5;cursor:progress}
+.month-nav{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.month-nav strong{flex:1;text-align:center;font-size:18px}
+.round{width:40px;height:40px;border-radius:50%;border:1.5px solid var(--grey);background:#fff;cursor:pointer;font-size:18px}
+.cal-title{font-weight:700;margin:14px 0 6px}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center}
+.dow{font-size:12px;font-weight:700;color:var(--muted);padding:4px 0}
+.day{border-radius:8px;padding:6px 0;font-size:14px;font-variant-numeric:tabular-nums;background:var(--wash)}
+.day.confirmed{background:var(--green);color:#fff}
+.day.blocked{background:var(--grey);color:var(--ink)}
+.day.pending{background:var(--amber);color:var(--amber-ink);box-shadow:inset 0 0 0 1.5px #e0b84a}
+.day.today{outline:2px solid var(--ink);outline-offset:-2px}
+.key{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted);margin-top:12px}
+.key i{display:inline-block;width:14px;height:14px;border-radius:4px;vertical-align:-2px;margin-right:6px}
+.list-item{display:flex;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.list-item:first-of-type{border-top:0}
+.status{font-size:12px;font-weight:700;border-radius:999px;padding:2px 9px;white-space:nowrap;align-self:flex-start}
+.status.Confirmed{background:var(--green-l);color:var(--green-d)}
+.status.Blocked{background:var(--grey)}
+.status.Pending{background:var(--amber);color:var(--amber-ink)}
+form.block{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+form.block label{display:flex;flex-direction:column;gap:4px;font-size:14px;font-weight:600}
+form.block .full{grid-column:1/-1}
+form.block input,form.block select{border:1.5px solid #cfd5d0;border-radius:10px;padding:10px 12px;background:#fff;color:var(--ink)}
+.toast{position:fixed;left:16px;right:16px;bottom:16px;max-width:520px;margin:0 auto;background:var(--ink);color:#fff;border-radius:12px;padding:12px 16px;opacity:0;transform:translateY(10px);transition:opacity .25s,transform .25s;pointer-events:none}
+.toast.show{opacity:1;transform:none}
+.toast.err{background:var(--red)}
+.foot{text-align:center;margin-top:20px;font-size:14px}
+.foot a{color:var(--green)}
+</style>
+</head>
+<body>
+<header><h1>Proudfoot bookings</h1><button class="refresh" type="button" id="refresh">Refresh</button></header>
+<main>
+  <section aria-labelledby="pend-h"><h2 id="pend-h">Needs a reply <span class="count" id="pend-count">0</span></h2><div id="pending"><p class="empty">Loading…</p></div></section>
+
+  <section aria-labelledby="month-h">
+    <h2 id="month-h">Month at a glance</h2>
+    <div class="month-nav"><button class="round" type="button" id="prev" aria-label="Previous month">‹</button><strong id="month-name"></strong><button class="round" type="button" id="next" aria-label="Next month">›</button></div>
+    <div id="cals"></div>
+    <div class="key"><span><i style="background:var(--green)"></i>Confirmed</span><span><i style="background:var(--amber);box-shadow:inset 0 0 0 1.5px #e0b84a"></i>Pending</span><span><i style="background:var(--grey)"></i>Blocked</span></div>
+  </section>
+
+  <section aria-labelledby="list-h"><h2 id="list-h">Bookings this month</h2><div id="list"></div></section>
+
+  <section aria-labelledby="block-h">
+    <h2 id="block-h">Close dates</h2>
+    <p class="muted" style="margin-bottom:12px">For family visits or maintenance. The website shows these nights as booked.</p>
+    <form class="block" id="block-form">
+      <label class="full">Place<select name="place"><option value="main-house">Main House</option><option value="cottage">Cottage</option></select></label>
+      <label>From<input type="date" name="from" required></label>
+      <label>Until (day you reopen)<input type="date" name="to" required></label>
+      <label class="full">Note (optional)<input type="text" name="note" maxlength="120" placeholder="e.g. Family weekend"></label>
+      <div class="full"><button class="btn go" type="submit">Close these dates</button></div>
+    </form>
+  </section>
+
+  <p class="foot"><a id="sheet-link" href="#" target="_blank" rel="noopener">Open the full bookings sheet</a></p>
+</main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  'use strict';
+  var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  var PLACE = { 'main-house': 'Main House', 'cottage': 'Cottage' };
+  var now = new Date(), view = { y: now.getFullYear(), m: now.getMonth() };
+
+  // Build elements with textContent only, so guest-typed text can never become HTML.
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function $(id) { return document.getElementById(id); }
+  function parse(s) { var p = String(s).split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function pretty(s) { var d = parse(s); return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()] + ' ' + d.getDate() + ' ' + MONTHS[d.getMonth()].slice(0, 3); }
+  function plural(n, a, b) { return n + ' ' + (n === 1 ? a : b); }
+  function toast(msg, err) { var t = $('toast'); t.textContent = msg; t.className = 'toast show' + (err ? ' err' : ''); clearTimeout(toast.t); toast.t = setTimeout(function () { t.className = 'toast'; }, 3200); }
+  function phoneDigits(p) { var d = String(p).replace(/[^\d+]/g, ''); if (d.charAt(0) === '0') d = '27' + d.slice(1); return d.replace('+', ''); }
+
+  function call(fn, args, ok) {
+    var r = google.script.run.withSuccessHandler(ok).withFailureHandler(function (e) { toast(e && e.message ? e.message : 'Something went wrong. Try again.', true); });
+    r[fn].apply(r, args);
+  }
+  function load() {
+    $('month-name').textContent = MONTHS[view.m] + ' ' + view.y;
+    call('getDashboard', [view.y, view.m], render);
+  }
+
+  function guestsLine(b) {
+    return plural(b.adults, 'adult', 'adults') + (b.children ? ', ' + plural(b.children, 'child', 'children') : '') + (b.dogs ? ', ' + plural(b.dogs, 'dog', 'dogs') : '');
+  }
+
+  function render(d) {
+    $('sheet-link').href = d.sheetUrl;
+    // Pending enquiries
+    var box = $('pending'); box.textContent = '';
+    $('pend-count').textContent = d.pending.length;
+    if (!d.pending.length) box.appendChild(el('p', 'empty', 'Nothing waiting. All enquiries have been answered.'));
+    d.pending.forEach(function (b) {
+      var c = el('article', 'card');
+      var top = el('div', 'card-top'); top.appendChild(el('h3', '', b.name || 'No name')); top.appendChild(el('span', 'place', PLACE[b.place]));
+      c.appendChild(top);
+      c.appendChild(el('p', 'dates', pretty(b.arrive) + ' to ' + pretty(b.leave) + ' · ' + plural(b.nights, 'night', 'nights')));
+      c.appendChild(el('p', 'meta', guestsLine(b) + (b.estimate ? ' · Estimate ' + b.estimate : '')));
+      if (b.message) c.appendChild(el('p', 'msg', b.message));
+      if (b.clash) c.appendChild(el('p', 'flag clash', 'These dates overlap a confirmed or blocked booking.'));
+      if (b.over) c.appendChild(el('p', 'flag over', 'More guests than the ' + PLACE[b.place] + ' usually sleeps. Check before confirming.'));
+      var act = el('div', 'actions');
+      var yes = el('button', 'btn go', 'Confirm'); yes.type = 'button';
+      var no = el('button', 'btn no', 'Decline'); no.type = 'button';
+      [[yes, 'Confirmed'], [no, 'Declined']].forEach(function (pair) {
+        pair[0].addEventListener('click', function () {
+          if (pair[1] === 'Declined' && !confirm('Decline the enquiry from ' + (b.name || 'this guest') + '?')) return;
+          yes.disabled = no.disabled = true;
+          call('setStatus', [b.id, pair[1]], function () { toast(pair[1] === 'Confirmed' ? 'Confirmed. The website now shows these dates as booked.' : 'Declined.'); load(); });
+        });
+      });
+      act.appendChild(yes); act.appendChild(no);
+      if (b.phone) {
+        var tel = el('a', 'btn ghost', 'Call'); tel.href = 'tel:' + String(b.phone).replace(/[^\d+]/g, ''); act.appendChild(tel);
+        var wa = el('a', 'btn ghost', 'WhatsApp'); wa.href = 'https://wa.me/' + phoneDigits(b.phone); wa.target = '_blank'; wa.rel = 'noopener'; act.appendChild(wa);
+      }
+      if (b.email) { var em = el('a', 'btn ghost', 'Email'); em.href = 'mailto:' + encodeURIComponent(b.email) + '?subject=' + encodeURIComponent('Your Proudfoot Holiday Farm enquiry'); act.appendChild(em); }
+      c.appendChild(act);
+      box.appendChild(c);
+    });
+
+    // Month calendars
+    var cals = $('cals'); cals.textContent = '';
+    var days = new Date(d.year, d.month + 1, 0).getDate(), offset = (new Date(d.year, d.month, 1).getDay() + 6) % 7;
+    ['main-house', 'cottage'].forEach(function (place) {
+      cals.appendChild(el('p', 'cal-title', PLACE[place]));
+      var g = el('div', 'grid');
+      ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].forEach(function (w) { g.appendChild(el('span', 'dow', w)); });
+      for (var i = 0; i < offset; i++) g.appendChild(el('span'));
+      for (var day = 1; day <= days; day++) {
+        var s = iso(new Date(d.year, d.month, day)), state = '', who = '';
+        d.bookings.forEach(function (b) {
+          if (b.place !== place || !(s >= b.arrive && s < b.leave)) return;
+          var k = b.status === 'Confirmed' ? 'confirmed' : b.status === 'Blocked' ? 'blocked' : 'pending';
+          if (!state || k === 'confirmed' || (k === 'blocked' && state === 'pending')) { state = k; who = b.name; }
+        });
+        var cell = el('span', 'day' + (state ? ' ' + state : '') + (s === d.today ? ' today' : ''), String(day));
+        cell.title = state ? (state.charAt(0).toUpperCase() + state.slice(1) + (who ? ': ' + who : '')) : 'Free';
+        g.appendChild(cell);
+      }
+      cals.appendChild(g);
+    });
+
+    // Month list
+    var list = $('list'); list.textContent = '';
+    var rows = d.bookings.slice().sort(function (a, b) { return a.arrive < b.arrive ? -1 : 1; });
+    if (!rows.length) list.appendChild(el('p', 'empty', 'No bookings this month yet.'));
+    rows.forEach(function (b) {
+      var item = el('div', 'list-item');
+      var txt = el('div');
+      txt.appendChild(el('p', 'dates', pretty(b.arrive) + ' to ' + pretty(b.leave) + ' · ' + PLACE[b.place]));
+      txt.appendChild(el('p', 'meta', (b.name || '') + (b.status !== 'Blocked' ? ' · ' + guestsLine(b) : '') + (b.phone ? ' · ' + b.phone : '')));
+      item.appendChild(el('span', 'status ' + b.status, b.status));
+      item.appendChild(txt);
+      if (b.status === 'Confirmed') {
+        var cancel = el('button', 'btn no', 'Cancel'); cancel.type = 'button'; cancel.style.marginLeft = 'auto'; cancel.style.alignSelf = 'center';
+        cancel.addEventListener('click', function () {
+          if (!confirm('Mark the booking for ' + (b.name || 'this guest') + ' as cancelled? The dates will open up on the website.')) return;
+          cancel.disabled = true;
+          call('setStatus', [b.id, 'Cancelled'], function () { toast('Cancelled. The dates are free again.'); load(); });
+        });
+        item.appendChild(cancel);
+      }
+      list.appendChild(item);
+    });
+  }
+
+  $('prev').addEventListener('click', function () { view.m--; if (view.m < 0) { view.m = 11; view.y--; } load(); });
+  $('next').addEventListener('click', function () { view.m++; if (view.m > 11) { view.m = 0; view.y++; } load(); });
+  $('refresh').addEventListener('click', load);
+  $('block-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var f = e.target, btn = f.querySelector('button');
+    btn.disabled = true;
+    call('blockDates', [f.place.value, f.from.value, f.to.value, f.note.value], function () {
+      btn.disabled = false; f.reset(); toast('Dates closed. The website now shows them as booked.'); load();
+    });
+    setTimeout(function () { btn.disabled = false; }, 4000);
+  });
+  load();
+})();
+</script>
+</body>
+</html>

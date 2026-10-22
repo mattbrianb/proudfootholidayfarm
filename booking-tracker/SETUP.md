@@ -1,47 +1,102 @@
-# Booking tracker setup
+# Booking tracker and owner dashboard setup
 
-The booking tracker is a Google Sheet. It's free and runs on the owner's Google account.
+The booking tracker is a private Google Sheet with a small script attached. It's free and runs on the owner's Google account.
 
-- **Website enquiries** land in the sheet as **Pending** and are emailed to the owner.
-- **The owner** changes the Status to **Confirmed** from the Google Sheets app on their phone.
-- **The website calendar** then shows those nights as booked.
-- **Guests** only ever see which dates are taken, never names or contact details.
+- **Website enquiries** land in the Sheet as **Pending** and are emailed to the owner.
+- **The guest** gets an automatic "we've received your enquiry" email, with their details, the estimate and what happens next.
+- **The owner** confirms or declines from the **owner dashboard** (a private page for their phone) or straight in the Sheet.
+- **The website calendar** shows Confirmed and Blocked nights as booked. Guests only ever see dates, never names or numbers.
 
-Setup takes about 10 minutes and is done once.
+Setup takes about 15 minutes and is done once. The script is published twice, once for the public website and once for the private dashboard.
 
-## 1. Create the sheet
+## How it stays secure
 
-1. Sign in to the Google account that should own the bookings. The owner's account is best.
-2. Go to [sheets.new](https://sheets.new) and name the sheet **Proudfoot Bookings**.
+The website's code is public on GitHub, so nothing private lives there.
+
+| Part | Who can reach it | What it can do |
+|---|---|---|
+| The bookings Sheet | Only people you share it with | Everything |
+| Public web app (the link in `config.js`) | Anyone | Return booked **dates** only, and accept new enquiries. It can't read guest details, change bookings or open the dashboard |
+| Owner dashboard (a second, private link) | Only the Google accounts in `DASHBOARD_ACCOUNTS` | View bookings, confirm, decline, cancel and close dates |
+
+The dashboard has three locks:
+1. **Google sign-in.** Google handles the password and 2-step verification, so there's no login page of ours to attack.
+2. **Allow-list.** Only the email addresses in `DASHBOARD_ACCOUNTS` get in. Everyone else sees "Not authorised".
+3. **Sheet sharing.** The dashboard runs as the person opening it, so they also need edit access to the Sheet.
+
+A leaked dashboard link is useless without those accounts. On top of that:
+- **Guest text is plain text.** Anything a guest types is shown as plain text in the dashboard and emails, so it can't inject code.
+- **The guest reply is rate-limited.** One enquiry per email address every 10 minutes, and at most 20 automatic replies an hour. A spammer can't use the form to flood someone's inbox.
+- **Turn on 2-step verification** on every Google account in the allow-list. That's the real key to the dashboard.
+
+**Never put the dashboard emails into the GitHub copy of `Code.gs`.** Fill them in only inside Apps Script.
+
+## 1. Create the Sheet
+
+1. Sign in to the **owner's** Google account and go to [sheets.new](https://sheets.new). Name the sheet **Proudfoot Bookings**.
+2. Share it (the **Share** button) only with people who should manage bookings, as **Editor**. Keep "General access" set to **Restricted**.
 
 ## 2. Add the script
 
-1. In the sheet, open **Extensions > Apps Script**.
-2. Delete what is in the editor, then paste in everything from `booking-tracker/Code.gs`.
-3. Near the top, check `OWNER_EMAIL`. Enquiry emails go to this address. To add more, separate them with commas.
-4. Click **Save** (the disk icon).
-5. Choose `setup` in the function drop-down at the top, then click **Run**.
-6. Google asks for permission. Click **Review permissions**, pick the account, then click **Advanced > Go to project (unsafe) > Allow**. The "unsafe" warning appears because the script is yours and not published by Google. The script only uses this sheet and sends email from your account.
-7. Go back to the sheet. There is now a **Bookings** tab with coloured headings and drop-downs.
+1. In the Sheet, open **Extensions > Apps Script**.
+2. In `Code.gs`, delete what's there and paste in everything from `booking-tracker/Code.gs`.
+3. Add the dashboard file:
+   1. Click **+** next to "Files" and choose **HTML**.
+   2. Name it exactly `Dashboard`.
+   3. Replace its contents with everything from `booking-tracker/Dashboard.html`.
+4. At the top of `Code.gs`, fill in your settings:
+   - `OWNER_EMAIL`: where enquiry emails go.
+   - `DASHBOARD_ACCOUNTS`: the Google account(s) allowed into the dashboard, for example `['owner@gmail.com', 'helper@gmail.com']`.
+   - `AUTO_REPLY`: `true` to email guests automatically, `false` to switch it off.
+5. Click **Save**.
+6. Choose `setup` in the function drop-down at the top and click **Run**.
+7. Approve the permissions. Click **Review permissions**, choose the account, then **Advanced > Go to project (unsafe) > Allow**. The "unsafe" warning only means Google hasn't reviewed your private script. It only touches this Sheet and sends email from your account.
+8. Back in the Sheet, there's now a **Bookings** tab with coloured headings and drop-downs.
 
-## 3. Publish it so the website can reach it
+## 3. Publish the public web app (for the website)
 
-1. In Apps Script, click **Deploy > New deployment**.
-2. Click the gear next to "Select type" and choose **Web app**.
-3. Fill in the settings:
-   - Description: `Proudfoot website`
+1. In Apps Script, click **Deploy > New deployment**, then the gear icon > **Web app**.
+2. Fill in the settings:
+   - Description: `Website`
    - Execute as: **Me**
    - Who has access: **Anyone**
-4. Click **Deploy**, then copy the **Web app URL**. It ends in `/exec`.
-5. Open `assets/js/config.js` in the website files and paste the URL between the quotes:
+3. Click **Deploy** and copy the **Web app URL** (it ends in `/exec`).
+4. Paste it into `assets/js/config.js` in the website files:
 
    ```js
    trackerUrl: 'https://script.google.com/macros/s/XXXXXXXX/exec'
    ```
 
-6. Save the file and push to GitHub. The calendar and enquiry form go live within a minute or two.
+5. Save, commit and push. The calendar and enquiry form switch over within a minute or two.
 
-## Running bookings day to day
+## 4. Publish the private owner dashboard
+
+1. In Apps Script, click **Deploy > New deployment** again, then the gear icon > **Web app**.
+2. Fill in the settings:
+   - Description: `Owner dashboard`
+   - Execute as: **User accessing the web app**
+   - Who has access: **Anyone with a Google account**. The allow-list and Sheet sharing do the real locking. Pick **Only myself** instead if only the Sheet's owner will ever use it.
+3. Click **Deploy** and copy this second **Web app URL**.
+4. Add `?view=dashboard` to the end. It looks like `https://script.google.com/macros/s/YYYYYYYY/exec?view=dashboard`.
+5. Open it on the owner's phone, signed into an allowed account, and approve the permissions once.
+6. Add it to the home screen so it opens like an app:
+   - **iPhone (Safari):** tap **Share > Add to Home Screen**.
+   - **Android (Chrome):** tap **⋮ > Add to Home screen**.
+
+Don't put the dashboard link on the website. Keep it in the owner's bookmarks or home screen.
+
+## Using the dashboard
+
+- **Needs a reply:** every upcoming Pending enquiry, with the dates, guests, estimate and message. It warns you if the dates overlap a confirmed booking or the group is bigger than usual.
+  - Tap **Confirm** or **Decline**.
+  - **Call**, **WhatsApp** and **Email** contact the guest straight away.
+- **Month at a glance:** a calendar for each place, with Confirmed nights in green, Pending in amber and Closed in grey. Use the arrows to change month.
+- **Bookings this month:** a list of everyone staying. Tap **Cancel** to free up a confirmed booking's dates.
+- **Close dates:** blocks nights for family visits or maintenance. The website shows them as booked.
+
+Changes show on the website calendar straight away.
+
+## Working in the Sheet directly
 
 The **Status** column controls everything:
 
@@ -49,22 +104,22 @@ The **Status** column controls everything:
 |---|---|---|
 | Pending | New enquiry, not yet answered | No |
 | Confirmed | Deposit paid or booking agreed | **Yes** |
-| Blocked | Dates you want closed (family visit, maintenance) | **Yes** |
+| Blocked | Dates you want closed | **Yes** |
 | Declined | You said no | No |
 | Cancelled | Guest cancelled | No |
 
-How to handle the common cases:
-
-- **Booking by phone or WhatsApp:** add a row yourself. Fill in Status, Place, Arrive and Leave; the other columns are optional.
-- **Leave is the check-out day.** A stay from Fri 12 to Mon 15 Dec blocks the nights of the 12th, 13th and 14th. The 15th stays free for the next guests.
-- **On your phone:** install the Google Sheets app, open **Proudfoot Bookings**, and tap a Status cell to change it.
-- **Double bookings:** if an enquiry overlaps a Confirmed or Blocked booking, the email says so.
+- **Leave is the check-out day.** A stay from Fri 12 to Mon 15 Dec blocks the nights of the 12th, 13th and 14th.
+- **Phone or WhatsApp bookings:** add a row by hand. Fill in Status, Place, Arrive and Leave; the dashboard adds an ID itself.
 
 ## Changing the script later
 
-If you edit `Code.gs`, publish the change:
+If you edit `Code.gs` or `Dashboard`, publish both web apps again:
 
 1. Click **Deploy > Manage deployments**.
-2. Click the pencil, set **Version** to **New version**, and click **Deploy**.
+2. For **each** deployment, click the pencil, set **Version** to **New version**, and click **Deploy**.
 
-The web app URL stays the same.
+Both links stay the same.
+
+## Email limits
+
+A free Google account can send about 100 emails a day through scripts. Each enquiry uses two: one to you, one to the guest. That's plenty for a holiday farm. If the daily allowance runs low, the guest reply is skipped, but you still get the enquiry.
