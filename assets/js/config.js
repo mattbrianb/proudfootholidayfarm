@@ -13,5 +13,5 @@ window.PROUDFOOT = {
 
   // Instagram feed: paste your Behold JSON feed URL here (https://feeds.behold.so/...).
   // Leave empty to show just the "Follow us" link. See README.md > Instagram feed.
-  instagramFeed: ''
+  instagramFeed: 'https://feeds.behold.so/jiMpyrKwQmgpy7E0U3jL'
 };
