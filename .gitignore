@@ -1,0 +1,6 @@
+# Original full-size photos (web-sized copies live in assets/img)
+Images/
+
+# Local design and tooling files
+.impeccable/
+.claude/
