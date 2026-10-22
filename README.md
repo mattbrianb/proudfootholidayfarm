@@ -61,6 +61,17 @@ Do these steps when you're happy with the preview.
 
 Once the custom domain is set, the preview address above forwards to the real domain.
 
+## Instagram feed
+
+The home page has a "Follow along on Instagram" section. Out of the box it shows the follow button. To show your latest 6 posts as well, use [Behold](https://behold.so), which is free for one feed of up to 6 posts:
+
+1. **Make the account a professional account.** Behold can only connect professional Instagram accounts. In the Instagram app, go to **Settings > Account type and tools > Switch to professional account**, then choose **Creator** or **Business**. It's free and can be switched back later.
+2. **Connect Instagram to Behold.** Sign up at behold.so and connect the @proudfootholidayfarm account.
+3. **Create a feed.** Choose **New feed > JSON**, then copy the feed URL. It looks like `https://feeds.behold.so/AbC123...`.
+4. **Paste the URL into the site.** Put it in `instagramFeed` in `assets/js/config.js`, then save and push.
+
+New posts appear on the site automatically, usually within a day. In Behold's feed settings you can also lock the feed to your domain: add both `www.proudfootholidayfarm.co.za` and `mattbrianb.github.io`.
+
 ## Turn on the booking calendar
 
 Until the tracker is connected, the enquiry form opens the guest's email app with the enquiry filled in, and the calendar lets them pick dates. To show booked dates and log enquiries in a Google Sheet, follow `booking-tracker/SETUP.md`.

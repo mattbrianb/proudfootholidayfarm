@@ -162,7 +162,7 @@
     loadAvailability().then(function (data) {
       if (!data) say('Pick your dates and send an enquiry. We will confirm availability when we reply.');
       else if (data.error) say('We could not load booked dates right now. Send your enquiry and we will confirm.', true);
-      else { live = true; booked = (data[place] || []).map(function (r) { return [r[0], r[1]]; }); say('Crossed-out dates are booked. Tap your arrival day, then the day you leave.'); }
+      else { live = true; var bk = $('[data-key-booked]', el); if (bk) bk.hidden = false; booked = (data[place] || []).map(function (r) { return [r[0], r[1]]; }); say('Crossed-out dates are booked. Tap your arrival day, then the day you leave.'); }
       self.setRange(sel.a, sel.b);
     });
   }
@@ -257,23 +257,125 @@
   }
   if (form && form.elements.place && p.place && PLACES[p.place]) { form.elements.place.value = p.place; form.elements.place.dispatchEvent(new Event('change')); }
 
-  /* Gallery lightbox */
+  /* Photo viewer: any [data-full] button inside a [data-gallery] group opens it */
   var lb = $('.lightbox');
   if (lb) {
-    var items = $all('.gallery button'), idx = 0, cap = $('figcaption', lb);
+    var group = [], idx = 0, cap = $('figcaption', lb);
     var img = document.createElement('img');
     cap.parentNode.insertBefore(img, cap);
-    function show(i) {
-      idx = (i + items.length) % items.length;
-      var b = items[idx];
-      img.src = b.getAttribute('data-full'); img.alt = b.querySelector('img').alt; cap.textContent = b.querySelector('img').alt;
-    }
-    items.forEach(function (b, i) { b.addEventListener('click', function () { show(i); lb.showModal(); }); });
+    var show = function (i) {
+      idx = (i + group.length) % group.length;
+      var b = group[idx], im = b.querySelector('img');
+      img.src = b.getAttribute('data-full'); img.alt = im.alt; cap.textContent = im.alt;
+    };
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-gallery] [data-full]');
+      if (!b) return;
+      group = $all('[data-full]', b.closest('[data-gallery]')).filter(function (x) { return !x.classList.contains('clone'); });
+      var orig = b.classList.contains('clone') ? group[+b.getAttribute('data-i')] : b;
+      show(group.indexOf(orig));
+      lb.showModal();
+    });
     $('.lb-prev', lb).addEventListener('click', function () { show(idx - 1); });
     $('.lb-next', lb).addEventListener('click', function () { show(idx + 1); });
     $('.lb-close', lb).addEventListener('click', function () { lb.close(); });
     lb.addEventListener('click', function (e) { if (e.target === lb || e.target.tagName === 'FIGURE') lb.close(); });
     lb.addEventListener('keydown', function (e) { if (e.key === 'ArrowLeft') show(idx - 1); if (e.key === 'ArrowRight') show(idx + 1); });
+  }
+
+  /* "View all photos" window */
+  var all = $('.all-photos');
+  if (all) {
+    $all('[data-open-all]').forEach(function (b) { b.addEventListener('click', function () { all.showModal(); }); });
+    $('.all-close', all).addEventListener('click', function () { all.close(); });
+    all.addEventListener('click', function (e) { if (e.target === all) all.close(); });
+  }
+
+  /* Home photo reel: drifts right to left, arrows jump a photo, drag or swipe to scroll */
+  var reel = $('[data-reel]');
+  if (reel) {
+    var track = $('.reel-track', reel);
+    var originals = $all('.reel-item', track);
+    originals.forEach(function (b) {
+      var c = b.cloneNode(true);
+      c.classList.add('clone'); c.setAttribute('aria-hidden', 'true'); c.tabIndex = -1;
+      track.appendChild(c);
+    });
+    var cards = $all('.reel-item', track);
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var SPEED = 34; // pixels per second
+    var x = 0, setW = 0, last = 0, hover = false, focus = false, visible = true, holdUntil = 0, anim = null;
+    var drag = null, dragged = false;
+    var measure = function () { setW = cards[originals.length].offsetLeft - cards[0].offsetLeft; };
+    var wrapX = function () { if (setW > 0) x = ((x % setW) + setW) % setW; };
+    var tick = function (t) {
+      var dt = last ? Math.min((t - last) / 1000, 0.1) : 0; last = t;
+      if (anim) {
+        var p = Math.min((t - anim.t0) / anim.d, 1), e = 1 - Math.pow(1 - p, 3);
+        x = anim.from + (anim.to - anim.from) * e;
+        if (p === 1) { anim = null; wrapX(); }
+      } else if (!drag && !reduce && !hover && !focus && visible && t > holdUntil) {
+        x += SPEED * dt; wrapX();
+      }
+      track.style.transform = 'translate3d(' + (-x) + 'px,0,0)';
+      requestAnimationFrame(tick);
+    };
+    var jump = function (dir) {
+      if (!setW) measure();
+      if (anim) { x = anim.to; anim = null; }
+      wrapX();
+      if (dir < 0 && x < 4) x += setW;
+      var target = null;
+      cards.forEach(function (c) {
+        var l = c.offsetLeft;
+        if (dir > 0 && l > x + 2 && (target === null || l < target)) target = l;
+        if (dir < 0 && l < x - 2 && (target === null || l > target)) target = l;
+      });
+      if (target === null) return;
+      anim = { from: x, to: target, t0: performance.now(), d: 520 };
+      holdUntil = performance.now() + 4000;
+    };
+    $('.reel-prev').addEventListener('click', function () { jump(-1); });
+    $('.reel-next').addEventListener('click', function () { jump(1); });
+    reel.addEventListener('mouseenter', function () { hover = true; });
+    reel.addEventListener('mouseleave', function () { hover = false; });
+    reel.addEventListener('focusin', function () { focus = true; });
+    reel.addEventListener('focusout', function () { focus = false; });
+    reel.addEventListener('pointerdown', function (e) { drag = { x0: e.clientX, start: x }; dragged = false; });
+    window.addEventListener('pointermove', function (e) {
+      if (!drag) return;
+      var dx = e.clientX - drag.x0;
+      if (Math.abs(dx) > 6) dragged = true;
+      if (dragged) { x = drag.start - dx; wrapX(); anim = null; }
+    });
+    window.addEventListener('pointerup', function () { if (drag) { drag = null; holdUntil = performance.now() + 3000; } });
+    reel.addEventListener('click', function (e) { if (dragged) { e.stopPropagation(); e.preventDefault(); dragged = false; } }, true);
+    if ('IntersectionObserver' in window) new IntersectionObserver(function (en) { visible = en[0].isIntersecting; }).observe(reel);
+    if ('ResizeObserver' in window) new ResizeObserver(measure).observe(track);
+    window.addEventListener('load', measure);
+    measure();
+    requestAnimationFrame(tick);
+  }
+
+  /* Instagram feed (Behold JSON feed URL in config.js) */
+  var ig = $('[data-instagram]');
+  if (ig && CFG.instagramFeed) {
+    fetch(CFG.instagramFeed)
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (d) {
+        (d.posts || []).slice(0, 6).forEach(function (p) {
+          var src = (p.sizes && p.sizes.medium && p.sizes.medium.mediaUrl) || (p.mediaType === 'VIDEO' ? p.thumbnailUrl : p.mediaUrl);
+          if (!src) return;
+          var a = document.createElement('a'), im = document.createElement('img');
+          a.href = p.permalink; a.target = '_blank'; a.rel = 'noopener';
+          im.src = src; im.loading = 'lazy';
+          im.alt = p.altText || (p.prunedCaption || 'Proudfoot Holiday Farm on Instagram').slice(0, 120);
+          a.setAttribute('aria-label', 'Open on Instagram: ' + im.alt);
+          a.appendChild(im); ig.appendChild(a);
+        });
+        if (ig.children.length) ig.hidden = false;
+      })
+      .catch(function () { /* leave the follow link on its own */ });
   }
 
   /* Re-apply #availability etc. once photos have loaded and the layout has settled */
