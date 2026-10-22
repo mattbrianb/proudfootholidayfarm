@@ -227,6 +227,9 @@ input[type=date]:hover::-webkit-calendar-picker-indicator{opacity:.9}
 .est-row span:last-child{font-weight:600;white-space:nowrap}
 .est-deposit{margin-top:6px;padding-top:10px;border-top:1px solid rgba(47,107,63,.2);font-weight:600}
 .est-warn{margin-top:10px;font-size:14px;color:var(--error)}
+.est-over{background:#fff4d6;color:#6b4a00;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:14px;line-height:1.5}
+.estimate.is-blocked{background:#f8e9e5;color:var(--error)}
+.est-block-title{font-weight:700;font-size:18px;margin-bottom:4px}
 .est-note{margin-top:10px;font-size:13px;color:var(--muted)}
 .form-note.error{background:#f8e9e5;color:var(--error)}
 .form-note.ok{background:var(--green-l);color:var(--green-d)}

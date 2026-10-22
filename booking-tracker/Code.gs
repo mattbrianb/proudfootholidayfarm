@@ -17,6 +17,8 @@ var HEADERS = ['Status', 'Place', 'Arrive', 'Leave', 'Nights', 'Guest name', 'Ph
 var STATUSES = ['Pending', 'Confirmed', 'Blocked', 'Declined', 'Cancelled'];
 var BLOCKING = ['Confirmed', 'Blocked'];
 var PLACES = { 'main-house': 'Main House', 'cottage': 'Cottage' };
+// Guests (adults + children): sleeps normally, max only by arrangement.
+var CAPACITY = { 'main-house': { sleeps: 15, max: 17 }, 'cottage': { sleeps: 2, max: 3 } };
 
 /** Run this once from the Apps Script editor to set up the sheet. */
 function setup() {
@@ -72,6 +74,8 @@ function doPost(e) {
     var required = ['place', 'arrive', 'leave', 'adults', 'name', 'phone', 'email'];
     for (var i = 0; i < required.length; i++) if (!d[required[i]]) return json({ ok: false, error: 'missing ' + required[i] });
     if (!PLACES[d.place]) return json({ ok: false, error: 'unknown place' });
+    var guests = num(d.adults) + num(d.children), cap = CAPACITY[d.place];
+    if (guests > cap.max) return json({ ok: false, error: 'too many guests' });
 
     // Simple flood protection: one enquiry per email address per minute.
     var cache = CacheService.getScriptCache(), key = 'e:' + String(d.email).toLowerCase();
@@ -104,6 +108,7 @@ function doPost(e) {
       'Email: ' + clean(d.email),
       d.message ? '\nMessage:\n' + clean(d.message, 2000) : '',
       clash ? '\nHeads up: these dates overlap a Confirmed or Blocked booking.' : '',
+      guests > cap.sleeps ? '\nHeads up: ' + guests + ' guests is more than the usual ' + cap.sleeps + '. Confirm with the guest before accepting.' : '',
       '',
       'Open the bookings sheet to confirm or decline: ' + SpreadsheetApp.getActiveSpreadsheet().getUrl()
     ].join('\n');

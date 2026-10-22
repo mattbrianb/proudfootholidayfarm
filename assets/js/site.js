@@ -3,8 +3,10 @@
   'use strict';
   var CFG = window.PROUDFOOT || {};
   var PLACES = {
-    'main-house': { name: 'The Main House', page: 'main-house.html', minNote: 'The Main House needs at least 6 adults out of season and 10 in season (public holidays, long weekends and December).' },
-    'cottage': { name: 'The Cottage', page: 'cottage.html', minNote: 'The Cottage sleeps 2 adults. We can add a mattress for a little one.' }
+    'main-house': { name: 'The Main House', page: 'main-house.html', sleeps: 15, max: 17,
+      minNote: 'The Main House sleeps 15 guests (adults and children). Minimum 6 adults out of season and 10 in season (public holidays, long weekends and December).' },
+    'cottage': { name: 'The Cottage', page: 'cottage.html', sleeps: 2, max: 3,
+      minNote: 'The Cottage sleeps 2 adults, plus a mattress for a little one.' }
   };
   var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -176,11 +178,37 @@
     if (placeSel) placeSel.addEventListener('change', updateMin);
     updateMin();
 
+    var count = function (k) { var v = parseInt(form.elements[k] && form.elements[k].value, 10); return isNaN(v) || v < 0 ? 0 : v; };
+    setTimeout(function () { setLimits(); });
+
+    /* Guest limits: up to "sleeps" is normal, up to "max" needs our OK, beyond that cannot be sent */
+    var placeInfo = function () { return PLACES[placeSel ? placeSel.value : ''] || PLACES['main-house']; };
+    var guests = function () {
+      var pl = placeInfo(), ad = count('adults'), ch = count('children'), total = ad + ch;
+      var g = { place: pl, adults: ad, children: ch, total: total, level: 'ok', msg: '' };
+      if (total > pl.max) {
+        g.level = 'block';
+        g.msg = pl.name + ' sleeps ' + pl.sleeps + (pl.sleeps === 2 ? ' adults, plus a little one on a mattress' : ' guests') +
+          '. We can never take more than ' + pl.max + ' people, so ' + total + ' guests is too many. Please lower the number of adults or children.';
+      } else if (total > pl.sleeps || (pl.sleeps === 2 && ad > 2)) {
+        g.level = 'over';
+        g.msg = pl.sleeps === 2
+          ? 'The Cottage sleeps 2 adults. A third guest is only possible for a little one on a mattress, and we need to confirm it with you before you book.'
+          : pl.name + ' sleeps ' + pl.sleeps + '. A group of ' + total + ' is only possible by arrangement, so we need to confirm it with you before you book.';
+      }
+      return g;
+    };
+    var setLimits = function () {
+      var pl = placeInfo();
+      form.elements.adults.max = pl.sleeps === 2 ? 3 : pl.max;
+      form.elements.children.max = pl.max - 1;
+    };
+    if (placeSel) placeSel.addEventListener('change', setLimits);
+
     /* Cost estimate: nights x (adults x R600 + children x R300 + dogs x R50) */
     var est = $('[data-estimate]', form);
     var RATE = { adult: 600, child: 300, dog: 50 };
     var rands = function (n) { return 'R' + String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0'); };
-    var count = function (k) { var v = parseInt(form.elements[k] && form.elements[k].value, 10); return isNaN(v) || v < 0 ? 0 : v; };
     var plural = function (n, one, many) { return n + ' ' + (n === 1 ? one : many); };
     var calc = function () {
       var a = form.elements.arrive.value, l = form.elements.leave.value, n = nights(a, l), ad = count('adults');
@@ -197,11 +225,16 @@
     };
     var renderEstimate = function () {
       if (!est) return;
+      var g = guests();
+      if (g.level !== 'block' && note.classList.contains('error')) setNote('');
+      est.classList.toggle('is-blocked', g.level === 'block');
+      if (g.level === 'block') { est.innerHTML = '<p class="est-block-title">Too many guests</p><p>' + g.msg + '</p>'; return; }
+      var overNote = g.level === 'over' ? '<p class="est-over"><strong>Needs our confirmation.</strong> ' + g.msg + '</p>' : '';
       var e = calc();
-      if (!e) { est.innerHTML = '<p class="est-empty">Choose your dates and number of guests to see an estimated total.</p>'; return; }
+      if (!e) { est.innerHTML = overNote + '<p class="est-empty">Choose your dates and number of guests to see an estimated total.</p>'; return; }
       var row = function (label, amount) { return '<div class="est-row"><span>' + label + '</span><span>' + rands(amount) + '</span></div>'; };
       var per = ' &times; ' + plural(e.nights, 'night', 'nights') + ' &times; ';
-      var html = '<div class="est-head"><span>Estimated total</span><strong>' + rands(e.total) + '</strong></div>';
+      var html = overNote + '<div class="est-head"><span>Estimated total</span><strong>' + rands(e.total) + '</strong></div>';
       html += row(plural(e.adults, 'adult', 'adults') + per + 'R600', e.adultCost);
       if (e.children) html += row(plural(e.children, 'child', 'children') + per + 'R300', e.childCost);
       if (e.dogs) html += row(plural(e.dogs, 'dog', 'dogs') + per + 'R50', e.dogCost);
@@ -210,8 +243,6 @@
       if (place === 'main-house') {
         var min = e.inSeason ? 10 : 6;
         if (e.adults < min) warn = 'The Main House needs at least ' + min + ' adults ' + (e.inSeason ? 'in December' : 'out of season') + '. We will confirm the price for your group when we reply.';
-      } else if (place === 'cottage' && e.adults > 2) {
-        warn = 'The Cottage sleeps 2 adults. For bigger groups, have a look at the Main House.';
       }
       if (warn) html += '<p class="est-warn">' + warn + '</p>';
       html += '<p class="est-note">An estimate only. We confirm the final amount, including public holiday and long weekend minimums, when we reply.</p>';
@@ -230,6 +261,8 @@
       f.forEach(function (v, k) { o[k] = String(v).trim(); });
       o.placeName = (PLACES[o.place] || {}).name || o.place;
       var e = calc();
+      var g = guests();
+      o.guestCheck = g.level === 'over' ? 'Over usual capacity (' + g.total + ' guests, sleeps ' + g.place.sleeps + '): needs confirmation' : '';
       o.estimate = e ? rands(e.total) + ' for ' + plural(e.nights, 'night', 'nights') + ' (deposit ' + rands(e.deposit) + ')' : '';
       return o;
     }
@@ -239,8 +272,11 @@
       ['name', 'phone', 'email', 'arrive', 'leave', 'adults'].forEach(function (k) { if (!o[k]) bad.push(k); });
       if (o.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(o.email)) bad.push('email');
       if (o.arrive && o.leave && o.leave <= o.arrive) bad.push('leave');
+      var g = guests();
+      if (g.level === 'block') { bad.push('adults'); if (count('children')) bad.push('children'); }
       bad.forEach(function (k) { if (form.elements[k]) form.elements[k].setAttribute('aria-invalid', 'true'); });
       if (bad.length) { form.elements[bad[0]].focus(); }
+      if (g.level === 'block') return g.msg;
       if (bad.indexOf('leave') > -1 && o.leave) return 'Your leaving date needs to be after your arrival date.';
       if (bad.indexOf('email') > -1 && o.email) return 'That email address does not look right. Please check it.';
       return bad.length ? 'Please fill in the highlighted fields.' : '';
@@ -249,6 +285,7 @@
       return 'Enquiry for ' + o.placeName + '\n' +
         'Dates: ' + pretty(o.arrive) + ' to ' + pretty(o.leave) + ' (' + nights(o.arrive, o.leave) + ' nights)\n' +
         'Adults: ' + o.adults + ', children (aged 2-12): ' + (o.children || 0) + ', dogs: ' + (o.dogs || 0) + '\n' +
+        (o.guestCheck ? o.guestCheck + '\n' : '') +
         (o.estimate ? 'Estimated total: ' + o.estimate + '\n' : '') +
         'Name: ' + o.name + '\nPhone: ' + o.phone + '\nEmail: ' + o.email + (o.message ? '\n\n' + o.message : '');
     }
@@ -256,9 +293,12 @@
     var waBtn = $('[data-wa-enquiry]', form);
     if (waBtn) waBtn.addEventListener('click', function () {
       var o = data();
+      var g = guests();
+      if (g.level === 'block') { setNote(g.msg, 'error'); form.elements.adults.focus(); return; }
       var text = 'Hi Proudfoot, I would like to enquire about ' + o.placeName +
         (o.arrive && o.leave ? ' from ' + pretty(o.arrive) + ' to ' + pretty(o.leave) : '') +
         (+o.adults ? ', ' + plural(+o.adults, 'adult', 'adults') : '') + (+o.children ? ', ' + plural(+o.children, 'child', 'children') : '') + (+o.dogs ? ', ' + plural(+o.dogs, 'dog', 'dogs') : '') + '.' +
+        (g.level === 'over' ? ' I know this is more than the usual ' + g.place.sleeps + ' guests, so please let me know if it is possible.' : '') +
         (o.estimate ? ' The website estimate is ' + o.estimate.replace(/ /g, ' ') + '.' : '');
       window.open(waLink(text), '_blank', 'noopener');
     });
