@@ -38,7 +38,7 @@
   <label>Arrive<input type="date" name="arrive" required></label>
   <label>Leave<input type="date" name="leave" required></label>
   <label>Adults<input type="number" name="adults" min="1" max="15" inputmode="numeric" required></label>
-  <label>Children (2 to 12)<input type="number" name="children" min="0" max="14" inputmode="numeric" value="0"></label>
+  <label>Children (aged 2 to 12)<input type="number" name="children" min="0" max="14" inputmode="numeric" value="0"></label>
   <label>Dogs<input type="number" name="dogs" min="0" max="10" inputmode="numeric" value="0"></label>
   <label>Your name<input type="text" name="name" autocomplete="name" required></label>
   <label>Phone<input type="tel" name="phone" autocomplete="tel" required></label>
@@ -46,6 +46,7 @@
   <label class="full">Anything else we should know? <span class="hint">Optional</span><textarea name="message"></textarea></label>
   <label class="hp" aria-hidden="true">Leave this empty<input type="text" name="website" tabindex="-1" autocomplete="off"></label>
   <p class="full hint" data-min-note></p>
+  <div class="full estimate" data-estimate aria-live="polite"><p class="est-empty">Choose your dates and number of guests to see an estimated total.</p></div>
   <div class="full" style="display:flex;flex-wrap:wrap;gap:12px"><button class="btn" type="submit">Send enquiry</button><button class="btn btn-ghost" type="button" data-wa-enquiry>Send on WhatsApp instead</button></div>
   <p class="form-note" role="status" aria-live="polite"></p>
 </form></div>

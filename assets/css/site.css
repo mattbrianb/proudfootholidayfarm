@@ -218,6 +218,16 @@ input[type=date]:hover::-webkit-calendar-picker-indicator{opacity:.9}
 .hp{position:absolute;left:-9999px}
 .form-note{grid-column:1/-1;font-size:15px;padding:12px 14px;border-radius:10px;background:var(--wash)}
 .form-note:empty{display:none}
+.estimate{background:var(--green-l);border-radius:14px;padding:18px 20px;color:var(--ink)}
+.est-empty{color:var(--green-d);font-size:15px}
+.est-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding-bottom:10px;margin-bottom:8px;border-bottom:1px solid rgba(47,107,63,.2)}
+.est-head span{font-weight:600}
+.est-head strong{font-size:30px;font-weight:700;color:var(--green-d);font-variant-numeric:tabular-nums}
+.est-row{display:flex;justify-content:space-between;gap:12px;font-size:15px;padding:4px 0;font-variant-numeric:tabular-nums}
+.est-row span:last-child{font-weight:600;white-space:nowrap}
+.est-deposit{margin-top:6px;padding-top:10px;border-top:1px solid rgba(47,107,63,.2);font-weight:600}
+.est-warn{margin-top:10px;font-size:14px;color:var(--error)}
+.est-note{margin-top:10px;font-size:13px;color:var(--muted)}
 .form-note.error{background:#f8e9e5;color:var(--error)}
 .form-note.ok{background:var(--green-l);color:var(--green-d)}
 

@@ -13,7 +13,7 @@
 var OWNER_EMAIL = 'admin@proudfootholidayfarm.co.za';
 
 var SHEET_NAME = 'Bookings';
-var HEADERS = ['Status', 'Place', 'Arrive', 'Leave', 'Nights', 'Guest name', 'Phone', 'Email', 'Adults', 'Children', 'Dogs', 'Message', 'Received'];
+var HEADERS = ['Status', 'Place', 'Arrive', 'Leave', 'Nights', 'Guest name', 'Phone', 'Email', 'Adults', 'Children', 'Dogs', 'Message', 'Received', 'Estimate'];
 var STATUSES = ['Pending', 'Confirmed', 'Blocked', 'Declined', 'Cancelled'];
 var BLOCKING = ['Confirmed', 'Blocked'];
 var PLACES = { 'main-house': 'Main House', 'cottage': 'Cottage' };
@@ -86,7 +86,7 @@ function doPost(e) {
     lock.waitLock(10000);
     var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
     sh.appendRow(['Pending', PLACES[d.place], arrive, leave, nights, clean(d.name), clean(d.phone), clean(d.email),
-      num(d.adults), num(d.children), num(d.dogs), clean(d.message, 2000), new Date()]);
+      num(d.adults), num(d.children), num(d.dogs), clean(d.message, 2000), new Date(), clean(d.estimate)]);
     lock.releaseLock();
 
     var clash = overlaps(sh, PLACES[d.place], arrive, leave);
@@ -96,7 +96,8 @@ function doPost(e) {
       '',
       'Place: ' + PLACES[d.place],
       'Dates: ' + fmt(arrive) + ' to ' + fmt(leave) + ' (' + nights + ' nights)',
-      'Adults: ' + num(d.adults) + '   Children (2-12): ' + num(d.children) + '   Dogs: ' + num(d.dogs),
+      'Adults: ' + num(d.adults) + '   Children (aged 2-12): ' + num(d.children) + '   Dogs: ' + num(d.dogs),
+      d.estimate ? 'Estimated total shown to the guest: ' + clean(d.estimate) : '',
       '',
       'Name: ' + clean(d.name),
       'Phone: ' + clean(d.phone),

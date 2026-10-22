@@ -175,6 +175,51 @@
     function updateMin() { if (minHint && placeSel) minHint.textContent = (PLACES[placeSel.value] || {}).minNote || ''; }
     if (placeSel) placeSel.addEventListener('change', updateMin);
     updateMin();
+
+    /* Cost estimate: nights x (adults x R600 + children x R300 + dogs x R50) */
+    var est = $('[data-estimate]', form);
+    var RATE = { adult: 600, child: 300, dog: 50 };
+    var rands = function (n) { return 'R' + String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0'); };
+    var count = function (k) { var v = parseInt(form.elements[k] && form.elements[k].value, 10); return isNaN(v) || v < 0 ? 0 : v; };
+    var plural = function (n, one, many) { return n + ' ' + (n === 1 ? one : many); };
+    var calc = function () {
+      var a = form.elements.arrive.value, l = form.elements.leave.value, n = nights(a, l), ad = count('adults');
+      if (!(n > 0) || !ad) return null;
+      var ch = count('children'), dg = count('dogs');
+      var e = { nights: n, adults: ad, children: ch, dogs: dg, adultCost: n * ad * RATE.adult, childCost: n * ch * RATE.child, dogCost: n * dg * RATE.dog };
+      e.total = e.adultCost + e.childCost + e.dogCost;
+      e.deposit = e.total / 2;
+      // December nights count as in season (public holidays and long weekends are confirmed by the owner)
+      var d = parse(a);
+      e.inSeason = false;
+      for (var i = 0; i < n; i++) { if (d.getMonth() === 11) e.inSeason = true; d.setDate(d.getDate() + 1); }
+      return e;
+    };
+    var renderEstimate = function () {
+      if (!est) return;
+      var e = calc();
+      if (!e) { est.innerHTML = '<p class="est-empty">Choose your dates and number of guests to see an estimated total.</p>'; return; }
+      var row = function (label, amount) { return '<div class="est-row"><span>' + label + '</span><span>' + rands(amount) + '</span></div>'; };
+      var per = ' &times; ' + plural(e.nights, 'night', 'nights') + ' &times; ';
+      var html = '<div class="est-head"><span>Estimated total</span><strong>' + rands(e.total) + '</strong></div>';
+      html += row(plural(e.adults, 'adult', 'adults') + per + 'R600', e.adultCost);
+      if (e.children) html += row(plural(e.children, 'child', 'children') + per + 'R300', e.childCost);
+      if (e.dogs) html += row(plural(e.dogs, 'dog', 'dogs') + per + 'R50', e.dogCost);
+      html += '<div class="est-row est-deposit"><span>50% deposit to secure your booking</span><span>' + rands(e.deposit) + '</span></div>';
+      var place = placeSel ? placeSel.value : '', warn = '';
+      if (place === 'main-house') {
+        var min = e.inSeason ? 10 : 6;
+        if (e.adults < min) warn = 'The Main House needs at least ' + min + ' adults ' + (e.inSeason ? 'in December' : 'out of season') + '. We will confirm the price for your group when we reply.';
+      } else if (place === 'cottage' && e.adults > 2) {
+        warn = 'The Cottage sleeps 2 adults. For bigger groups, have a look at the Main House.';
+      }
+      if (warn) html += '<p class="est-warn">' + warn + '</p>';
+      html += '<p class="est-note">An estimate only. We confirm the final amount, including public holiday and long weekend minimums, when we reply.</p>';
+      est.innerHTML = html;
+    };
+    ['input', 'change'].forEach(function (ev) { form.addEventListener(ev, renderEstimate); });
+    form.addEventListener('reset', function () { setTimeout(renderEstimate); });
+    renderEstimate();
     form.elements.arrive.addEventListener('change', function () {
       var d = parse(form.elements.arrive.value); if (!d) return;
       d.setDate(d.getDate() + 1); form.elements.leave.min = iso(d);
@@ -184,6 +229,8 @@
       var f = new FormData(form), o = {};
       f.forEach(function (v, k) { o[k] = String(v).trim(); });
       o.placeName = (PLACES[o.place] || {}).name || o.place;
+      var e = calc();
+      o.estimate = e ? rands(e.total) + ' for ' + plural(e.nights, 'night', 'nights') + ' (deposit ' + rands(e.deposit) + ')' : '';
       return o;
     }
     function check(o) {
@@ -201,7 +248,8 @@
     function summary(o) {
       return 'Enquiry for ' + o.placeName + '\n' +
         'Dates: ' + pretty(o.arrive) + ' to ' + pretty(o.leave) + ' (' + nights(o.arrive, o.leave) + ' nights)\n' +
-        'Adults: ' + o.adults + ', children (2-12): ' + (o.children || 0) + ', dogs: ' + (o.dogs || 0) + '\n' +
+        'Adults: ' + o.adults + ', children (aged 2-12): ' + (o.children || 0) + ', dogs: ' + (o.dogs || 0) + '\n' +
+        (o.estimate ? 'Estimated total: ' + o.estimate + '\n' : '') +
         'Name: ' + o.name + '\nPhone: ' + o.phone + '\nEmail: ' + o.email + (o.message ? '\n\n' + o.message : '');
     }
 
@@ -210,7 +258,8 @@
       var o = data();
       var text = 'Hi Proudfoot, I would like to enquire about ' + o.placeName +
         (o.arrive && o.leave ? ' from ' + pretty(o.arrive) + ' to ' + pretty(o.leave) : '') +
-        (o.adults ? ', ' + o.adults + ' adults' : '') + (o.children ? ', ' + o.children + ' children' : '') + (o.dogs ? ', ' + o.dogs + ' dogs' : '') + '.';
+        (+o.adults ? ', ' + plural(+o.adults, 'adult', 'adults') : '') + (+o.children ? ', ' + plural(+o.children, 'child', 'children') : '') + (+o.dogs ? ', ' + plural(+o.dogs, 'dog', 'dogs') : '') + '.' +
+        (o.estimate ? ' The website estimate is ' + o.estimate.replace(/ /g, ' ') + '.' : '');
       window.open(waLink(text), '_blank', 'noopener');
     });
 
@@ -240,6 +289,7 @@
 
     this.prefill = function (p) {
       ['arrive', 'leave', 'adults'].forEach(function (k) { if (p[k] && form.elements[k]) form.elements[k].value = p[k]; });
+      renderEstimate();
     };
   }
 
