@@ -14,7 +14,6 @@ A plain HTML/CSS/JavaScript site, hosted free on GitHub Pages at **www.proudfoot
 | `assets/js/site.js` | Menu, booking bar, calendar, gallery and enquiry form |
 | `assets/img/` | Web-sized photos, sorted into `main-house/`, `cottage/`, `farm/` and `brand/` |
 | `booking-tracker/` | The Google Sheet booking tracker. Start with `SETUP.md` |
-| `CNAME` | Tells GitHub Pages the custom domain |
 
 The original full-size photos stay in `Images/` on your computer. `.gitignore` keeps them out of GitHub, because the site uses the smaller copies in `assets/img/`.
 
@@ -26,37 +25,41 @@ The original full-size photos stay in `Images/` on your computer. `.gitignore` k
   1. Save it into the right `assets/img/` folder twice: once about 1800px wide (`name.jpg`) and once about 720px wide (`name-sm.jpg`).
   2. Copy one of the `<button ... data-full=...>` lines in that page's gallery and change the file name and description.
 
-## Publish on GitHub Pages
+## Publishing
 
-1. Create a repository on GitHub, for example `proudfoot-website`, and push this folder to it:
+The site lives in the GitHub repository `mattbrianb/proudfootholidayfarm` and is published by GitHub Pages (Settings > Pages: Deploy from a branch, `main`, `/ (root)`).
 
-   ```bash
-   git init
-   git add .
-   git commit -m "New Proudfoot website"
-   git branch -M main
-   git remote add origin https://github.com/YOUR-USERNAME/proudfoot-website.git
-   git push -u origin main
-   ```
+**Preview address (before launch):** https://mattbrianb.github.io/proudfootholidayfarm/
 
-2. On GitHub, go to **Settings > Pages**. Under **Source**, choose **Deploy from a branch**, then branch `main` and folder `/ (root)`. Save.
-3. Under **Custom domain**, enter `www.proudfootholidayfarm.co.za` and save. The `CNAME` file already holds this.
+To publish a change, save your edits, then run:
 
-## Point the domain at GitHub
+```bash
+git add .
+git commit -m "Describe the change"
+git push
+```
 
-At the company that manages the domain's DNS (where the `.co.za` domain is registered), replace the records that currently point to Wix:
+GitHub updates the site a minute or two later.
 
-| Type | Name / Host | Value |
-|---|---|---|
-| CNAME | `www` | `YOUR-USERNAME.github.io` |
-| A | `@` | `185.199.108.153` |
-| A | `@` | `185.199.109.153` |
-| A | `@` | `185.199.110.153` |
-| A | `@` | `185.199.111.153` |
+## Launch day: switch the domain from Wix to GitHub
 
-DNS changes can take a few hours to spread. Once GitHub shows the domain as verified, tick **Enforce HTTPS** in Settings > Pages.
+Do these steps when you're happy with the preview.
 
-Don't cancel the Wix plan until the new site loads on the domain.
+1. **Tell GitHub the domain.** In the repository on GitHub, go to **Settings > Pages**. Under **Custom domain**, enter `www.proudfootholidayfarm.co.za` and click **Save**. This adds a `CNAME` file to the repository. Afterwards, run `git pull` on your computer so your copy has it too.
+2. **Point the domain at GitHub.** At whoever manages the domain's DNS (if the domain was bought through Wix, that's **Wix > Domains > Manage DNS records**), replace the records that point to Wix. Delete the old Wix `A` and `CNAME` records for `@` and `www`, but leave any `MX` (email) records alone.
+
+   | Type | Name / Host | Value |
+   |---|---|---|
+   | CNAME | `www` | `mattbrianb.github.io` |
+   | A | `@` | `185.199.108.153` |
+   | A | `@` | `185.199.109.153` |
+   | A | `@` | `185.199.110.153` |
+   | A | `@` | `185.199.111.153` |
+
+3. **Wait and turn on HTTPS.** DNS changes take from a few minutes to a few hours to spread. When Settings > Pages shows the DNS check as successful, tick **Enforce HTTPS**.
+4. **Keep Wix until it's working.** Don't cancel the Wix plan until the new site loads on www.proudfootholidayfarm.co.za.
+
+Once the custom domain is set, the preview address above forwards to the real domain.
 
 ## Turn on the booking calendar
 
