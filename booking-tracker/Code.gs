@@ -15,8 +15,13 @@
  * - The owner dashboard (a separate, private deployment) shows bookings at a glance.
  */
 
-// Who gets the enquiry emails. Add more addresses separated by commas.
+// Who gets the new-enquiry emails. Add more addresses separated by commas.
+// Use the Gmail address that runs this script (not a forwarder back to it): Gmail can hide
+// emails that leave an account and come straight back to it through forwarding.
 var OWNER_EMAIL = 'admin@proudfootholidayfarm.co.za';
+
+// When a guest presses Reply on any email from this script, it goes here.
+var GUEST_REPLY_TO = 'admin@proudfootholidayfarm.co.za';
 
 // Google accounts allowed to open the owner dashboard. Fill these in inside Apps Script
 // only (never commit real addresses to the public GitHub repository).
@@ -198,7 +203,7 @@ function guestReply_(d, arrive, leave, nights, guests, cap, fmt) {
 
   MailApp.sendEmail({
     to: String(d.email).trim(),
-    replyTo: OWNER_EMAIL,
+    replyTo: GUEST_REPLY_TO,
     name: 'Proudfoot Holiday Farm',
     subject: 'We have received your enquiry: Proudfoot Holiday Farm',
     body: text,
@@ -336,7 +341,7 @@ function guestEmail_(kind, b) {
     after.map(function (p) { return '<p>' + h(p) + '</p>'; }).join('') +
     '<p>Questions? Call or WhatsApp <b>' + h(PHONE_MAIN) + '</b> (or ' + h(PHONE_ALT) + '), or reply to this email.</p>' +
     '<p>Warm regards,<br><b>Proudfoot Holiday Farm</b><br><a href="' + SITE_URL + '" style="color:#2f6b3f">' + SITE_URL.replace('https://', '') + '</a></p></div>';
-  MailApp.sendEmail({ to: String(b.email).trim(), replyTo: OWNER_EMAIL, name: 'Proudfoot Holiday Farm', subject: subject, body: text, htmlBody: html });
+  MailApp.sendEmail({ to: String(b.email).trim(), replyTo: GUEST_REPLY_TO, name: 'Proudfoot Holiday Farm', subject: subject, body: text, htmlBody: html });
 }
 
 function findRow_(id) {

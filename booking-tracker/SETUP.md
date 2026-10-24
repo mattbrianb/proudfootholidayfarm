@@ -31,6 +31,16 @@ A leaked dashboard link is useless without those accounts. On top of that:
 
 **Never put the dashboard emails into the GitHub copy of `Code.gs`.** Fill them in only inside Apps Script.
 
+## Who the emails come from
+
+Google sends every email from the account that **published** the script, the one shown under "Execute as: Me". So whoever does steps 3 and 4 is the sender, and that should be the farm's own Gmail account (for example `admin@falls.co.za`).
+
+In `Code.gs`:
+- `OWNER_EMAIL` is where new-enquiry emails go. Use that same Gmail address, not a forwarder that leads back to it, because Gmail can hide emails that come straight back to the account that sent them.
+- `GUEST_REPLY_TO` is where guests' replies go (for example `admin@proudfootholidayfarm.co.za`).
+
+If someone else built the Sheet, move it to the farm account: share it, transfer ownership, then let the farm account do steps 3 and 4 itself (see "Moving the tracker to another Google account" at the end).
+
 ## 1. Create the Sheet
 
 1. Sign in to the **owner's** Google account and go to [sheets.new](https://sheets.new). Name the sheet **Proudfoot Bookings**.
@@ -128,3 +138,15 @@ Both links stay the same.
 ## Email limits
 
 A free Google account can send about 100 emails a day through scripts. Each enquiry uses two: one to you, one to the guest. That's plenty for a holiday farm. If the daily allowance runs low, the guest reply is skipped, but you still get the enquiry.
+
+## Moving the tracker to another Google account
+
+Use this to change who the emails come from.
+
+1. **Old owner:** open the Sheet and click **Share**.
+   - Add the new account as **Editor**.
+   - Open the drop-down next to their name and choose **Transfer ownership**.
+2. **New account:** accept the ownership email (or find the Sheet under **Shared with me** in Google Drive and accept it there).
+3. **New account:** open the Sheet, then **Extensions > Apps Script**. Check the settings at the top of `Code.gs` (`OWNER_EMAIL`, `GUEST_REPLY_TO`, `DASHBOARD_ACCOUNTS`), then run `setup` once to approve the permissions.
+4. **New account:** do steps 3 and 4 above again to create **new** Website and Owner dashboard links. Put the new website link into `assets/js/config.js`, then push.
+5. **New account:** in **Deploy > Manage deployments**, **archive** the old owner's two deployments. Until you do, they keep running and sending emails as the old owner.
