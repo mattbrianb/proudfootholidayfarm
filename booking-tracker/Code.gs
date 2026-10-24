@@ -23,6 +23,12 @@ var OWNER_EMAIL = 'admin@proudfootholidayfarm.co.za';
 // When a guest presses Reply on any email from this script, it goes here.
 var GUEST_REPLY_TO = 'admin@proudfootholidayfarm.co.za';
 
+// Send every email from this address. It must be a "Send mail as" alias already set up in the
+// Gmail account that runs the script (Gmail > Settings > Accounts). Leave empty to send from
+// that Gmail address itself. If the alias ever fails, the email still goes out from the Gmail address.
+var SEND_FROM = 'admin@proudfootholidayfarm.co.za';
+var SEND_NAME = 'Proudfoot Holiday Farm';
+
 // Google accounts allowed to open the owner dashboard. Fill these in inside Apps Script
 // only (never commit real addresses to the public GitHub repository).
 var DASHBOARD_ACCOUNTS = ['owner@example.com'];
@@ -145,7 +151,7 @@ function doPost(e) {
       '',
       'Open the bookings sheet to confirm or decline: ' + SpreadsheetApp.getActiveSpreadsheet().getUrl()
     ].join('\n');
-    MailApp.sendEmail({
+    sendMail_({
       to: OWNER_EMAIL,
       replyTo: clean_(d.email),
       subject: 'Booking enquiry: ' + PLACES[d.place] + ', ' + fmt(arrive) + ' (' + clean_(d.name) + ')',
@@ -201,10 +207,10 @@ function guestReply_(d, arrive, leave, nights, guests, cap, fmt) {
     '<p>Questions? Call or WhatsApp <b>' + h(PHONE_MAIN) + '</b> (or ' + h(PHONE_ALT) + '), or simply reply to this email.</p>' +
     '<p>Warm regards,<br><b>Proudfoot Holiday Farm</b><br><a href="' + SITE_URL + '" style="color:#2f6b3f">' + SITE_URL.replace('https://', '') + '</a></p></div>';
 
-  MailApp.sendEmail({
+  sendMail_({
     to: String(d.email).trim(),
     replyTo: GUEST_REPLY_TO,
-    name: 'Proudfoot Holiday Farm',
+    name: SEND_NAME,
     subject: 'We have received your enquiry: Proudfoot Holiday Farm',
     body: text,
     htmlBody: html
@@ -341,7 +347,50 @@ function guestEmail_(kind, b) {
     after.map(function (p) { return '<p>' + h(p) + '</p>'; }).join('') +
     '<p>Questions? Call or WhatsApp <b>' + h(PHONE_MAIN) + '</b> (or ' + h(PHONE_ALT) + '), or reply to this email.</p>' +
     '<p>Warm regards,<br><b>Proudfoot Holiday Farm</b><br><a href="' + SITE_URL + '" style="color:#2f6b3f">' + SITE_URL.replace('https://', '') + '</a></p></div>';
-  MailApp.sendEmail({ to: String(b.email).trim(), replyTo: GUEST_REPLY_TO, name: 'Proudfoot Holiday Farm', subject: subject, body: text, htmlBody: html });
+  sendMail_({ to: String(b.email).trim(), replyTo: GUEST_REPLY_TO, name: SEND_NAME, subject: subject, body: text, htmlBody: html });
+}
+
+/**
+ * Sends an email from SEND_FROM through the Gmail API (needs only the "send email" permission,
+ * never access to read the mailbox). Falls back to MailApp, which sends from the script owner's
+ * Gmail address, so an email is never lost.
+ */
+function sendMail_(o) {
+  var name = o.name || SEND_NAME;
+  if (SEND_FROM) {
+    try {
+      var line = function (v) { return String(v || '').replace(/[\r\n]+/g, ' ').trim(); }; // no header injection
+      var b64 = function (v) { return Utilities.base64Encode(String(v), Utilities.Charset.UTF_8); };
+      var word = function (v) { return '=?UTF-8?B?' + b64(line(v)) + '?='; };
+      var wrap = function (v) { return b64(v).replace(/.{76}/g, '$&\r\n'); };
+      var boundary = 'pf' + Utilities.getUuid().replace(/-/g, '');
+      var mime = [
+        'From: ' + word(name) + ' <' + line(SEND_FROM) + '>',
+        'To: ' + line(o.to),
+        o.replyTo ? 'Reply-To: ' + line(o.replyTo) : '',
+        'Subject: ' + word(o.subject),
+        'MIME-Version: 1.0',
+        'Content-Type: multipart/alternative; boundary="' + boundary + '"',
+        '',
+        '--' + boundary,
+        'Content-Type: text/plain; charset=UTF-8',
+        'Content-Transfer-Encoding: base64',
+        '',
+        wrap(o.body),
+        '--' + boundary,
+        'Content-Type: text/html; charset=UTF-8',
+        'Content-Transfer-Encoding: base64',
+        '',
+        wrap(o.htmlBody || '<pre style="font-family:Arial,sans-serif;white-space:pre-wrap">' + esc_(o.body) + '</pre>'),
+        '--' + boundary + '--'
+      ].filter(function (x, i) { return x !== '' || i > 4; }).join('\r\n');
+      Gmail.Users.Messages.send({ raw: Utilities.base64EncodeWebSafe(mime, Utilities.Charset.UTF_8) }, 'me');
+      return;
+    } catch (err) {
+      console.warn('Sending as ' + SEND_FROM + ' failed, sending from the Gmail address instead: ' + err);
+    }
+  }
+  MailApp.sendEmail({ to: o.to, replyTo: o.replyTo, name: name, subject: o.subject, body: o.body, htmlBody: o.htmlBody });
 }
 
 function findRow_(id) {

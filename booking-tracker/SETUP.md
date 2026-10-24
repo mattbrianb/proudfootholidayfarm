@@ -33,13 +33,15 @@ A leaked dashboard link is useless without those accounts. On top of that:
 
 ## Who the emails come from
 
-Google sends every email from the account that **published** the script, the one shown under "Execute as: Me". So whoever does steps 3 and 4 is the sender, and that should be the farm's own Gmail account (for example `admin@falls.co.za`).
+Google runs the script, and sends its emails, as the account that **owns the Sheet and publishes the script**. That should be the farm's Gmail account (`admin@falls.co.za`).
 
-In `Code.gs`:
-- `OWNER_EMAIL` is where new-enquiry emails go. Use that same Gmail address, not a forwarder that leads back to it, because Gmail can hide emails that come straight back to the account that sent them.
-- `GUEST_REPLY_TO` is where guests' replies go (for example `admin@proudfootholidayfarm.co.za`).
+The emails can also show the farm's own address. If that Gmail account has `admin@proudfootholidayfarm.co.za` set up as a **"Send mail as"** alias (Gmail > Settings > Accounts), set `SEND_FROM` to it and every email goes out as **"Proudfoot Holiday Farm" <admin@proudfootholidayfarm.co.za>**.
 
-If someone else built the Sheet, move it to the farm account: share it, transfer ownership, then let the farm account do steps 3 and 4 itself (see "Moving the tracker to another Google account" at the end).
+To send as the alias, the script uses Gmail's sending interface with the **"Send email on your behalf"** permission only. It can never read, change or delete the mailbox. If the alias ever stops working, emails go out from the Gmail address instead, so nothing is lost.
+
+The other email settings in `Code.gs`:
+- `OWNER_EMAIL` is where new-enquiry emails go.
+- `GUEST_REPLY_TO` is where guests' replies go.
 
 ## 1. Create the Sheet
 
@@ -58,9 +60,15 @@ If someone else built the Sheet, move it to the farm account: share it, transfer
    - `OWNER_EMAIL`: where enquiry emails go.
    - `DASHBOARD_ACCOUNTS`: the Google account(s) allowed into the dashboard, for example `['owner@gmail.com', 'helper@gmail.com']`.
    - `AUTO_REPLY`: `true` to email guests automatically, `false` to switch it off.
-5. Click **Save**.
-6. Choose `setup` in the function drop-down at the top and click **Run**.
-7. Approve the permissions. Click **Review permissions**, choose the account, then **Advanced > Go to project (unsafe) > Allow**. The "unsafe" warning only means Google hasn't reviewed your private script. It only touches this Sheet and sends email from your account.
+5. Turn on the permissions file and the Gmail sender:
+   1. Click the **gear icon (Project Settings)** on the left and tick **Show "appsscript.json" manifest file in editor**.
+   2. Back in the editor, open `appsscript.json` and replace everything with the contents of `booking-tracker/appsscript.json`. This switches on the Gmail sender and limits the script to exactly the permissions listed below.
+6. Click **Save**, then choose `setup` in the function drop-down at the top and click **Run**.
+7. Approve the permissions. Click **Review permissions**, choose the account, then **Advanced > Go to project (unsafe)**. Tick every box, then click **Allow**. The "unsafe" warning only means Google hasn't reviewed your private script. The permissions are:
+   - see and edit **only this spreadsheet**,
+   - **send** email on your behalf (it can't read your mailbox),
+   - see your email address (to check dashboard access),
+   - show the "sheet is ready" pop-up.
 8. Back in the Sheet, there's now a **Bookings** tab with coloured headings and drop-downs.
 
 ## 3. Publish the public web app (for the website)
@@ -141,12 +149,14 @@ A free Google account can send about 100 emails a day through scripts. Each enqu
 
 ## Moving the tracker to another Google account
 
-Use this to change who the emails come from.
+Google only transfers ownership inside the same organisation. Between two ordinary Gmail accounts, the new account makes a copy instead. The copy brings the bookings and the script with it.
 
-1. **Old owner:** open the Sheet and click **Share**.
-   - Add the new account as **Editor**.
-   - Open the drop-down next to their name and choose **Transfer ownership**.
-2. **New account:** accept the ownership email (or find the Sheet under **Shared with me** in Google Drive and accept it there).
-3. **New account:** open the Sheet, then **Extensions > Apps Script**. Check the settings at the top of `Code.gs` (`OWNER_EMAIL`, `GUEST_REPLY_TO`, `DASHBOARD_ACCOUNTS`), then run `setup` once to approve the permissions.
-4. **New account:** do steps 3 and 4 above again to create **new** Website and Owner dashboard links. Put the new website link into `assets/js/config.js`, then push.
-5. **New account:** in **Deploy > Manage deployments**, **archive** the old owner's two deployments. Until you do, they keep running and sending emails as the old owner.
+1. **Old owner:** share the Sheet with the new account as **Editor**.
+2. **New account:** open the Sheet and choose **File > Make a copy**.
+   - Name it **Proudfoot Bookings**.
+   - Share it with the old owner as Editor if they should keep access.
+3. **New account:** in the copy, open **Extensions > Apps Script** and follow step 2 above. That means pasting the latest `Code.gs`, `Dashboard.html` and `appsscript.json`, and checking the settings at the top of `Code.gs`. Then run `setup` and approve the permissions.
+4. **New account:** do steps 3 and 4 above to create new **Website** and **Owner dashboard** links.
+   - Put the new website link into `assets/js/config.js` and push.
+   - Use the new dashboard link from now on.
+5. **Old owner:** in the **old** Sheet's Apps Script, go to **Deploy > Manage deployments** and **archive** both deployments. Until you do, the old links keep working and sending email as the old owner. Then delete or rename the old Sheet so nobody uses it by mistake.
