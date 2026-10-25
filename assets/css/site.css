@@ -159,6 +159,12 @@ input[type=date]:hover::-webkit-calendar-picker-indicator{opacity:.9}
 .side-card dd{font-weight:600;text-align:right}
 .side-card .btn{width:100%;margin-top:22px}
 
+/* Wildlife videos */
+.videos{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.vid video{width:100%;aspect-ratio:16/9;border-radius:var(--radius);background:#111;display:block}
+.vid figcaption{font-size:15px;color:var(--muted);margin-top:8px}
+@media (max-width:860px){.videos{grid-template-columns:1fr}}
+
 /* Gallery */
 .gallery{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
 .gallery button{padding:0;border:0;background:none;cursor:zoom-in;border-radius:10px;overflow:hidden;aspect-ratio:4/3}
