@@ -304,6 +304,7 @@ input[type=date]:hover::-webkit-calendar-picker-indicator{opacity:.9}
   .ig-grid{grid-template-columns:repeat(3,1fr)}
   .all-inner{padding:0 16px 24px}
   .gallery{grid-template-columns:repeat(2,1fr)}
+  .gallery button:first-child{grid-row:auto;aspect-ratio:4/3}
   .cal-months{grid-template-columns:1fr}
   .cal-months .cal-month+.cal-month{display:none}
   .lightbox figure{padding:56px 12px 0}
